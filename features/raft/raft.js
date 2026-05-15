@@ -1,16 +1,12 @@
 /**
  * features/raft/raft.js
- * 伐採アクション: ランダムでいかだ材料 1〜2 を取得
+ * 伐採アクションの定数定義
+ * ロジック本体は SnakeBag / RaftTrack / Paralysis と連携して index.html で処理する
  */
 (function () {
   const RaftAction = {
-    /**
-     * 伐採を実行し、取得したいかだ材料の量を返す
-     * @returns {number} 1〜2
-     */
-    cut: function () {
-      return Math.floor(Math.random() * 2) + 1;
-    },
+    GUARANTEED: 1,   // 森の入り口で必ず確保できる木材（1本）
+    MAX_DEEPER: 5,   // 奥に進むとき宣言できる最大本数
   };
 
   window.RaftAction = RaftAction;

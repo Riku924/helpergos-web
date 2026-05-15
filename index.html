@@ -25,13 +25,15 @@
     /* ── Resources ── */
     .resources {
       display: flex;
-      gap: 20px;
+      gap: 18px;
       background: rgba(0,0,0,0.35);
-      padding: 14px 28px;
+      padding: 14px 24px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.1);
+      flex-wrap: wrap;
+      justify-content: center;
     }
-    .resource { text-align: center; }
+    .resource { text-align: center; min-width: 70px; }
     .resource .icon  { font-size: 1.8em; }
     .resource .label { font-size: 0.72em; color: #aaa; margin-top: 2px; }
     .resource .value {
@@ -42,30 +44,41 @@
     .value.danger { color: #ff6b6b; }
     .value.ok     { color: #69ff99; }
 
+    /* いかだトラック */
+    .track-wrap { text-align: center; min-width: 120px; }
+    .track-bar {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin: 6px 0 4px;
+    }
+    .track-box {
+      width: 14px; height: 14px;
+      border: 2px solid #666;
+      border-radius: 3px;
+      background: transparent;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .track-box.filled { background: #8bc34a; border-color: #8bc34a; }
+    .raft-completed {
+      font-size: 0.8em;
+      color: #aaa;
+    }
+    .raft-completed span { color: #ffd700; font-weight: bold; font-size: 1.2em; }
+
     /* ── Weather card ── */
     .weather-area {
       background: rgba(0,0,0,0.3);
       border-radius: 12px;
-      padding: 14px 28px;
+      padding: 12px 24px;
       border: 1px solid rgba(255,255,255,0.1);
       text-align: center;
       width: 100%;
       max-width: 480px;
     }
-    .weather-area .section-label {
-      font-size: 0.75em;
-      color: #aaa;
-      margin-bottom: 6px;
-    }
-    .weather-card-display {
-      font-size: 2.4em;
-      min-height: 1.2em;
-    }
-    .weather-desc {
-      font-size: 0.85em;
-      color: #87ceeb;
-      margin-top: 4px;
-    }
+    .section-label { font-size: 0.75em; color: #aaa; margin-bottom: 6px; }
+    .weather-card-display { font-size: 2.2em; min-height: 1.2em; }
+    .weather-desc { font-size: 0.85em; color: #87ceeb; margin-top: 4px; }
     .flip-btn {
       margin-top: 10px;
       padding: 8px 24px;
@@ -78,33 +91,41 @@
       font-family: inherit;
       font-weight: bold;
     }
-    .flip-btn:hover { background: #ffe44d; }
-    .flip-btn:disabled {
-      background: #555;
-      color: #888;
-      cursor: default;
-    }
+    .flip-btn:hover:not(:disabled) { background: #ffe44d; }
+    .flip-btn:disabled { background: #555; color: #888; cursor: default; }
 
     /* ── Players ── */
-    .players { display: flex; gap: 10px; }
+    .players { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     .player-card {
       padding: 7px 16px;
       border-radius: 8px;
       background: rgba(255,255,255,0.08);
       border: 2px solid transparent;
       font-size: 0.88em;
-      transition: all 0.2s;
       text-align: center;
+      transition: all 0.2s;
+      min-width: 90px;
     }
     .player-card.active {
       border-color: #ffd700;
       background: rgba(255,215,0,0.15);
       font-weight: bold;
     }
-    .player-card .leader-badge {
+    .player-card.paralyzed {
+      border-color: #9c27b0;
+      background: rgba(156,39,176,0.15);
+      opacity: 0.7;
+    }
+    .leader-badge {
       font-size: 0.7em;
       display: block;
       color: #ffd700;
+      min-height: 1em;
+    }
+    .para-badge {
+      font-size: 0.7em;
+      display: block;
+      color: #ce93d8;
       min-height: 1em;
     }
 
@@ -121,7 +142,7 @@
     .escape-hint       { font-size: 0.72em; color: #aaa; margin-top: 5px; }
 
     /* ── Actions ── */
-    .actions { display: flex; gap: 12px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
     .action-btn {
       padding: 12px 18px;
       font-size: 0.9em;
@@ -148,7 +169,7 @@
       padding: 10px 14px;
       width: 100%;
       max-width: 520px;
-      max-height: 170px;
+      max-height: 160px;
       overflow-y: auto;
       border: 1px solid rgba(255,255,255,0.08);
     }
@@ -162,8 +183,11 @@
     .log-entry.round-end { color: #ffd700; }
     .log-entry.danger    { color: #ff6b6b; }
     .log-entry.weather   { color: #87ceeb; }
+    .log-entry.snake     { color: #ce93d8; }
+    .log-entry.raft-done { color: #8bc34a; }
+    .log-entry.paralyzed { color: #ff9800; }
 
-    /* ── Overlay ── */
+    /* ── 共通オーバーレイ ── */
     .overlay {
       position: fixed;
       inset: 0;
@@ -177,12 +201,86 @@
       background: #0d2b45;
       border: 3px solid #ffd700;
       border-radius: 16px;
-      padding: 32px 44px;
+      padding: 28px 36px;
       text-align: center;
-      max-width: 360px;
+      max-width: 400px;
+      width: 90%;
     }
-    .overlay-box h2 { font-size: 2em; margin-bottom: 10px; }
-    .overlay-box p  { color: #ccc; margin-bottom: 22px; line-height: 1.6; }
+    .overlay-box h2 { font-size: 1.8em; margin-bottom: 10px; }
+    .overlay-box p  { color: #ccc; margin-bottom: 20px; line-height: 1.6; }
+
+    /* ── 伐採モーダル専用 ── */
+    .raft-modal-box { border-color: #8bc34a; }
+    .raft-modal-box h3 { font-size: 1.4em; margin-bottom: 10px; color: #8bc34a; }
+    .raft-modal-box .info-text { font-size: 0.92em; color: #ccc; line-height: 1.6; margin-bottom: 16px; }
+    .raft-modal-box .bold-green { color: #8bc34a; font-weight: bold; }
+    .btn-row { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
+    .step-btn {
+      padding: 10px 22px;
+      font-size: 0.95em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+    }
+    .step-btn.cancel  { background: #555; color: #fff; }
+    .step-btn.cancel:hover { background: #666; }
+    .step-btn.go      { background: #8bc34a; color: #1a2a00; }
+    .step-btn.go:hover { background: #9ccc65; }
+    .step-btn.danger  { background: #c62828; color: #fff; }
+    .step-btn.danger:hover { background: #e53935; }
+    .step-btn.primary { background: #ffd700; color: #1a2a00; }
+    .step-btn.primary:hover { background: #ffe44d; }
+
+    /* 本数セレクター */
+    .count-selector {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+    .cnt-btn {
+      padding: 8px 14px;
+      font-size: 0.9em;
+      border: 2px solid #555;
+      border-radius: 8px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .cnt-btn:hover  { border-color: #8bc34a; color: #8bc34a; }
+    .cnt-btn.active { border-color: #8bc34a; background: rgba(139,195,74,0.2); color: #8bc34a; font-weight: bold; }
+    .safe-prob { font-size: 0.82em; color: #aaa; margin: 6px 0 14px; min-height: 1.2em; }
+
+    /* 玉表示 */
+    .balls-display {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .ball {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4em;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+    .ball.white { background: #f5f5f5; }
+    .ball.black { background: #212121; border: 2px solid #555; }
+
+    .result-msg { font-size: 1em; line-height: 1.6; margin-bottom: 16px; }
+    .result-msg.success { color: #8bc34a; }
+    .result-msg.bitten  { color: #ff6b6b; }
+
+    /* ゲーム終了 */
     .restart-btn {
       padding: 10px 32px;
       font-size: 1em;
@@ -214,10 +312,12 @@
       <div class="label">水</div>
       <div class="value" id="water">0</div>
     </div>
-    <div class="resource">
+    <!-- いかだトラック -->
+    <div class="track-wrap">
       <div class="icon">🪵</div>
-      <div class="label">いかだ</div>
-      <div class="value" id="raft">0</div>
+      <div class="label">いかだトラック</div>
+      <div class="track-bar" id="track-bar"></div>
+      <div class="raft-completed">完成: <span id="raft-completed">0</span>枚</div>
     </div>
   </div>
 
@@ -231,23 +331,35 @@
 
   <!-- Players -->
   <div class="players" id="players">
-    <div class="player-card" data-idx="0"><span class="leader-badge" id="badge-0"></span>プレイヤー1</div>
-    <div class="player-card" data-idx="1"><span class="leader-badge" id="badge-1"></span>プレイヤー2</div>
-    <div class="player-card" data-idx="2"><span class="leader-badge" id="badge-2"></span>プレイヤー3</div>
+    <div class="player-card" data-idx="0">
+      <span class="leader-badge" id="badge-0"></span>
+      <span class="para-badge"   id="para-0"></span>
+      プレイヤー1
+    </div>
+    <div class="player-card" data-idx="1">
+      <span class="leader-badge" id="badge-1"></span>
+      <span class="para-badge"   id="para-1"></span>
+      プレイヤー2
+    </div>
+    <div class="player-card" data-idx="2">
+      <span class="leader-badge" id="badge-2"></span>
+      <span class="para-badge"   id="para-2"></span>
+      プレイヤー3
+    </div>
   </div>
 
   <!-- Turn info -->
   <div class="turn-info">
     <div class="round-label">ラウンド <span id="round">1</span></div>
     <div class="current-player-label" id="phase-msg">リーダーが天候カードをめくるのを待っています</div>
-    <div class="escape-hint">脱出条件: 食料・水・いかだ が各 3 以上</div>
+    <div class="escape-hint">脱出条件: 食料・水 各3以上 ＆ 完成いかだ 3枚以上</div>
   </div>
 
   <!-- Actions -->
   <div class="actions">
     <button class="action-btn btn-fish"  id="btn-fish"  onclick="doAction('fish')"  disabled>🐟 釣り<small>食料 +1〜3</small></button>
     <button class="action-btn btn-water" id="btn-water" onclick="doAction('water')" disabled>💧 水汲み<small id="water-hint">雨量: ?</small></button>
-    <button class="action-btn btn-log"   id="btn-log"   onclick="doAction('log')"   disabled>🪵 伐採<small>いかだ +1〜2</small></button>
+    <button class="action-btn btn-log"   id="btn-log"   onclick="startLogging()"   disabled>🪵 伐採<small>森へ入る</small></button>
   </div>
 
   <!-- Log -->
@@ -255,8 +367,50 @@
     <div class="log-entry">ゲーム開始！ 3人で力を合わせて脱出しよう。</div>
   </div>
 
-  <!-- Game End Overlay -->
-  <div class="overlay" id="overlay" style="display:none">
+  <!-- ═══ 伐採モーダル ═══ -->
+  <div class="overlay" id="raft-modal" style="display:none">
+    <div class="overlay-box raft-modal-box">
+
+      <!-- Step1: 森の奥へ進むか -->
+      <div id="raft-step1">
+        <h3>🪵 伐採</h3>
+        <p class="info-text">
+          森の入り口で木材を<span class="bold-green">1本</span>確保した！<br>
+          いかだトラック +1<br>
+          <br>
+          毒蛇だらけの森の奥へ進みますか？
+        </p>
+        <div class="btn-row">
+          <button class="step-btn cancel" onclick="chooseDeeper(false)">🏃 やめておく</button>
+          <button class="step-btn danger" onclick="chooseDeeper(true)">🐍 奥へ進む！</button>
+        </div>
+      </div>
+
+      <!-- Step2: 本数を選んで引く -->
+      <div id="raft-step2" style="display:none">
+        <h3>🐍 森の奥…</h3>
+        <p class="info-text">何本の木を集めますか？<br>宣言した数だけ玉を引きます。</p>
+        <div class="count-selector" id="count-selector"></div>
+        <p class="safe-prob" id="safe-prob">本数を選んでください</p>
+        <div class="btn-row">
+          <button class="step-btn cancel" onclick="chooseDeeper(false)">← 戻る</button>
+          <button class="step-btn go" id="draw-btn" onclick="doDraw()" disabled>玉を引く！</button>
+        </div>
+      </div>
+
+      <!-- Step3: 結果表示 -->
+      <div id="raft-step3" style="display:none">
+        <h3 id="raft-result-title"></h3>
+        <div class="balls-display" id="balls-display"></div>
+        <p class="result-msg" id="raft-result-msg"></p>
+        <button class="step-btn primary" onclick="closeRaftModal()">OK</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ ゲーム終了オーバーレイ ═══ -->
+  <div class="overlay" id="end-overlay" style="display:none">
     <div class="overlay-box">
       <h2 id="ov-title"></h2>
       <p  id="ov-msg"></p>
@@ -270,51 +424,49 @@
   <script src="features/water/water.js"></script>
   <script src="features/food/food.js"></script>
   <script src="features/raft/raft.js"></script>
+  <script src="features/snake/snake.js"></script>
+  <script src="features/paralysis/paralysis.js"></script>
+  <script src="features/rafttrack/rafttrack.js"></script>
 
   <script>
     const PLAYERS = 3;
 
-    // ゲーム状態
     const G = {
-      food: 0, water: 0, raft: 0,
+      food: 0, water: 0,
       round: 1,
       phase: 'weather',   // 'weather' | 'action' | 'ended'
-      turnOrder: [],       // このラウンドのターン順 (プレイヤーインデックス配列)
-      turnIndex: 0,        // turnOrder 内の現在位置
+      turnOrder: [],
+      turnIndex: 0,
+      selectedCount: 0,   // 伐採モーダルで選択中の本数
     };
 
-    function currentPlayerIdx() {
-      return G.turnOrder[G.turnIndex];
-    }
+    function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
     function pname(i) { return 'プレイヤー' + (i + 1); }
 
-    // ── 天候カードをめくる ──
+    // ─────────────────────────────────────────────
+    //  天候カード
+    // ─────────────────────────────────────────────
     function flipWeather() {
-      const rain = Weather.draw();
+      const rain  = Weather.draw();
       const label = Weather.getLabel();
-
       document.getElementById('weather-icon').textContent = label.icon + ' ' + label.text;
       document.getElementById('weather-desc').textContent = label.desc;
       document.getElementById('flip-btn').disabled = true;
       document.getElementById('water-hint').textContent =
         rain === 0 ? '雨なし (0)' : '雨量: ' + rain;
-
-      addLog(
-        'リーダー ' + Leader.name() + ' が天候カードをめくった → ' +
-        label.icon + ' ' + label.text + ' (' + label.desc + ')',
-        'weather'
-      );
-
-      // アクションフェイズへ
+      addLog('リーダー ' + Leader.name() + ' が天候カードをめくった → ' +
+             label.icon + ' ' + label.text + ' (' + label.desc + ')', 'weather');
       G.phase = 'action';
       enableActions(true);
+      checkAndSkipParalyzed();
       updateUI();
     }
 
-    // ── アクション実行 ──
+    // ─────────────────────────────────────────────
+    //  通常アクション（釣り・水汲み）
+    // ─────────────────────────────────────────────
     function doAction(type) {
-      let n = 0;
-      let msg = '';
+      let n = 0, msg = '';
       const who = pname(currentPlayerIdx());
 
       if (type === 'fish') {
@@ -325,32 +477,144 @@
         n = WaterAction.collect();
         G.water += n;
         msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '');
-      } else if (type === 'log') {
-        n = RaftAction.cut();
-        G.raft += n;
-        msg = who + ' が伐採して いかだ材 +' + n;
       }
 
       addLog(msg);
+      if (checkWin()) return;
+      advanceTurn();
+    }
 
-      // 勝利チェック
-      if (G.food >= PLAYERS && G.water >= PLAYERS && G.raft >= PLAYERS) {
-        updateUI();
-        endGame(true);
+    // ─────────────────────────────────────────────
+    //  伐採: Step1 → モーダルを開く
+    // ─────────────────────────────────────────────
+    function startLogging() {
+      enableActions(false);
+
+      // 入り口の1本を確保してトラックを進める
+      const newRafts = RaftTrack.advance(RaftAction.GUARANTEED);
+      if (newRafts > 0) {
+        addLog('いかだ完成！ いかだカードを ' + newRafts + ' 枚獲得！', 'raft-done');
+      }
+      updateRaftTrack();
+
+      // モーダルをStep1で開く
+      showRaftStep(1);
+      document.getElementById('raft-modal').style.display = 'flex';
+    }
+
+    // ─────────────────────────────────────────────
+    //  伐採: Step2 → 奥へ進むか選択
+    // ─────────────────────────────────────────────
+    function chooseDeeper(goDeeper) {
+      if (!goDeeper) {
+        // やめる → モーダルを閉じてターン終了
+        addLog(pname(currentPlayerIdx()) + ' は森の入り口で引き返した。いかだトラック +1');
+        document.getElementById('raft-modal').style.display = 'none';
+        if (checkWin()) return;
+        advanceTurn();
         return;
       }
+      // Step2へ
+      G.selectedCount = 0;
+      buildCountSelector();
+      showRaftStep(2);
+    }
 
-      // 次のターンへ
+    function buildCountSelector() {
+      const sel = document.getElementById('count-selector');
+      sel.innerHTML = '';
+      for (let i = 1; i <= RaftAction.MAX_DEEPER; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'cnt-btn';
+        btn.textContent = i + '本';
+        btn.onclick = () => selectCount(i);
+        sel.appendChild(btn);
+      }
+      document.getElementById('draw-btn').disabled = true;
+      document.getElementById('safe-prob').textContent = '本数を選んでください';
+    }
+
+    function selectCount(n) {
+      G.selectedCount = n;
+      document.querySelectorAll('.cnt-btn').forEach((b, i) => {
+        b.classList.toggle('active', i + 1 === n);
+      });
+      const prob = SnakeBag.safePercent(n);
+      document.getElementById('safe-prob').textContent =
+        n + '本宣言 → 安全確率 ' + prob + '%（白7・黒3 の袋）';
+      document.getElementById('draw-btn').disabled = false;
+    }
+
+    // ─────────────────────────────────────────────
+    //  伐採: Step3 → 玉を引く
+    // ─────────────────────────────────────────────
+    function doDraw() {
+      const n = G.selectedCount;
+      const { bitten, drawn } = SnakeBag.draw(n);
+      const who = pname(currentPlayerIdx());
+
+      // 玉を表示
+      const ballsEl = document.getElementById('balls-display');
+      ballsEl.innerHTML = '';
+      drawn.forEach(color => {
+        const div = document.createElement('div');
+        div.className = 'ball ' + color;
+        div.textContent = color === 'white' ? '⚪' : '⚫';
+        ballsEl.appendChild(div);
+      });
+
+      if (bitten) {
+        // 毒蛇に噛まれた
+        Paralysis.inflict(currentPlayerIdx(), G.round);
+        document.getElementById('raft-result-title').textContent = '🐍 毒蛇に噛まれた！';
+        document.getElementById('raft-result-msg').className = 'result-msg bitten';
+        document.getElementById('raft-result-msg').innerHTML =
+          '黒い玉を引いてしまった…<br>' +
+          who + ' は次のラウンドのアクションフェイズが終わるまで<br>麻痺して動けない！<br>' +
+          '<small>いかだトラックは入り口の +1 のみ</small>';
+        addLog(who + ' が毒蛇に噛まれた！ 次ラウンド麻痺。', 'snake');
+      } else {
+        // 成功
+        const newRafts = RaftTrack.advance(n);
+        if (newRafts > 0) {
+          addLog('いかだ完成！ いかだカードを ' + newRafts + ' 枚獲得！', 'raft-done');
+        }
+        updateRaftTrack();
+        document.getElementById('raft-result-title').textContent = '✅ 成功！';
+        document.getElementById('raft-result-msg').className = 'result-msg success';
+        document.getElementById('raft-result-msg').innerHTML =
+          '全て白い玉！ 木材を ' + n + ' 本追加確保！<br>' +
+          'いかだトラック +' + n + '<br>' +
+          '完成いかだ: ' + RaftTrack.completed + '枚';
+        addLog(who + ' が伐採成功！ いかだトラック +' + (RaftAction.GUARANTEED + n), 'raft-done');
+      }
+
+      showRaftStep(3);
+    }
+
+    function closeRaftModal() {
+      document.getElementById('raft-modal').style.display = 'none';
+      if (checkWin()) return;
+      advanceTurn();
+    }
+
+    function showRaftStep(n) {
+      [1, 2, 3].forEach(i => {
+        document.getElementById('raft-step' + i).style.display = (i === n) ? '' : 'none';
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    //  ターン進行
+    // ─────────────────────────────────────────────
+    function advanceTurn() {
       G.turnIndex++;
 
       if (G.turnIndex >= PLAYERS) {
-        // ラウンド終了処理
+        // ラウンド終了
         G.food  -= PLAYERS;
         G.water -= PLAYERS;
-        addLog(
-          '── ラウンド ' + G.round + ' 終了: 食料 -' + PLAYERS + '、水 -' + PLAYERS + ' ──',
-          'round-end'
-        );
+        addLog('── ラウンド ' + G.round + ' 終了: 食料 -' + PLAYERS + '、水 -' + PLAYERS + ' ──', 'round-end');
         G.round++;
 
         if (G.food < 0 || G.water < 0) {
@@ -371,18 +635,46 @@
         document.getElementById('water-hint').textContent   = '雨量: ?';
         document.getElementById('flip-btn').disabled = false;
         enableActions(false);
+        updateUI();
+        return;
       }
 
+      checkAndSkipParalyzed();
       updateUI();
     }
 
-    function enableActions(on) {
-      ['btn-fish', 'btn-water', 'btn-log'].forEach(id => {
-        document.getElementById(id).disabled = !on;
-      });
+    /** 麻痺中のプレイヤーを自動スキップ */
+    function checkAndSkipParalyzed() {
+      while (
+        G.phase === 'action' &&
+        G.turnIndex < PLAYERS &&
+        Paralysis.isParalyzed(currentPlayerIdx(), G.round)
+      ) {
+        addLog(pname(currentPlayerIdx()) + ' は麻痺中のため行動できない！', 'paralyzed');
+        G.turnIndex++;
+      }
+
+      if (G.phase === 'action' && G.turnIndex >= PLAYERS) {
+        // 全員スキップされた場合はラウンド終了へ
+        advanceTurn();
+      }
     }
 
-    // ── UI更新 ──
+    // ─────────────────────────────────────────────
+    //  勝利チェック
+    // ─────────────────────────────────────────────
+    function checkWin() {
+      if (G.food >= PLAYERS && G.water >= PLAYERS && RaftTrack.completed >= PLAYERS) {
+        updateUI();
+        endGame(true);
+        return true;
+      }
+      return false;
+    }
+
+    // ─────────────────────────────────────────────
+    //  UI 更新
+    // ─────────────────────────────────────────────
     function updateUI() {
       const setVal = (id, v) => {
         const el = document.getElementById(id);
@@ -391,19 +683,26 @@
       };
       setVal('food',  G.food);
       setVal('water', G.water);
-      setVal('raft',  G.raft);
+
+      updateRaftTrack();
+
       document.getElementById('round').textContent = G.round;
 
-      // リーダーバッジ
+      // リーダー・麻痺バッジ
       for (let i = 0; i < PLAYERS; i++) {
         document.getElementById('badge-' + i).textContent =
           i === Leader.current ? '👑 リーダー' : '';
+        const isParalyzed = Paralysis.isParalyzed(i, G.round);
+        document.getElementById('para-' + i).textContent =
+          isParalyzed ? '💀 麻痺中' : '';
+        const card = document.querySelector('.player-card[data-idx="' + i + '"]');
+        card.classList.toggle('paralyzed', isParalyzed);
       }
 
       // アクティブプレイヤー
       const activePIdx = G.phase === 'action' ? currentPlayerIdx() : Leader.current;
       document.querySelectorAll('.player-card').forEach((el, i) => {
-        el.classList.toggle('active', i === activePIdx);
+        el.classList.toggle('active', i === activePIdx && !Paralysis.isParalyzed(i, G.round));
       });
 
       // フェイズメッセージ
@@ -414,23 +713,43 @@
         msgEl.textContent = pname(currentPlayerIdx()) + ' のターン';
       }
 
-      // flip ボタン: 天候フェイズかつリーダーのみ有効
       document.getElementById('flip-btn').disabled =
         G.phase !== 'weather' || Weather.current !== null;
     }
 
-    // ── ゲーム終了 ──
+    function updateRaftTrack() {
+      const bar = document.getElementById('track-bar');
+      bar.innerHTML = '';
+      for (let i = 0; i < RaftTrack.GOAL; i++) {
+        const box = document.createElement('div');
+        box.className = 'track-box' + (i < RaftTrack.position ? ' filled' : '');
+        bar.appendChild(box);
+      }
+      document.getElementById('raft-completed').textContent = RaftTrack.completed;
+    }
+
+    function enableActions(on) {
+      ['btn-fish', 'btn-water', 'btn-log'].forEach(id => {
+        document.getElementById(id).disabled = !on;
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    //  ゲーム終了
+    // ─────────────────────────────────────────────
     function endGame(won) {
       G.phase = 'ended';
       enableActions(false);
-      document.getElementById('overlay').style.display = 'flex';
+      document.getElementById('end-overlay').style.display = 'flex';
       document.getElementById('ov-title').textContent = won ? '🎉 脱出成功！' : '💀 力尽きた…';
       document.getElementById('ov-msg').textContent = won
         ? 'ラウンド ' + (G.round - 1) + ' で全員分の資源を揃えて脱出しました！'
         : 'ラウンド ' + (G.round - 1) + ' で食料か水が底をつきました。';
     }
 
-    // ── ログ追記 ──
+    // ─────────────────────────────────────────────
+    //  ログ
+    // ─────────────────────────────────────────────
     function addLog(msg, cls) {
       const log = document.getElementById('log');
       const div = document.createElement('div');
@@ -440,17 +759,21 @@
       log.scrollTop = log.scrollHeight;
     }
 
-    // ── リスタート ──
+    // ─────────────────────────────────────────────
+    //  リスタート
+    // ─────────────────────────────────────────────
     function restartGame() {
       Object.assign(G, {
-        food: 0, water: 0, raft: 0,
-        round: 1, phase: 'weather', turnIndex: 0,
+        food: 0, water: 0,
+        round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0,
       });
       Leader.init(PLAYERS);
       Weather.init();
+      RaftTrack.init();
+      Paralysis.reset();
       G.turnOrder = Leader.turnOrder();
 
-      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('end-overlay').style.display = 'none';
       document.getElementById('flip-btn').disabled = false;
       document.getElementById('weather-icon').textContent = '──';
       document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
@@ -462,9 +785,13 @@
       addLog(Leader.name() + ' がリーダーに選ばれた！');
     }
 
-    // ── 初期化 ──
+    // ─────────────────────────────────────────────
+    //  初期化
+    // ─────────────────────────────────────────────
     Leader.init(PLAYERS);
     Weather.init();
+    RaftTrack.init();
+    Paralysis.reset();
     G.turnOrder = Leader.turnOrder();
     updateUI();
     addLog(Leader.name() + ' がリーダーに選ばれた！');
