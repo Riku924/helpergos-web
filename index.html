@@ -158,9 +158,10 @@
     .action-btn:hover:not(:disabled) { transform: translateY(-3px); }
     .action-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
     .action-btn small { display: block; font-weight: normal; font-size: 0.78em; opacity: 0.85; }
-    .btn-fish  { background: #2196f3; color: #fff; }
-    .btn-water { background: #00bcd4; color: #fff; }
-    .btn-log   { background: #8bc34a; color: #1a2a00; }
+    .btn-fish     { background: #2196f3; color: #fff; }
+    .btn-water    { background: #00bcd4; color: #fff; }
+    .btn-log      { background: #8bc34a; color: #1a2a00; }
+    .btn-scavenge { background: #795548; color: #fff; }
 
     /* ── Log ── */
     .log {
@@ -186,6 +187,52 @@
     .log-entry.snake     { color: #ce93d8; }
     .log-entry.raft-done { color: #8bc34a; }
     .log-entry.paralyzed { color: #ff9800; }
+    .log-entry.scavenge  { color: #bcaaa4; }
+
+    /* 手札枚数バッジ */
+    .hand-badge {
+      font-size: 0.7em;
+      display: block;
+      color: #bcaaa4;
+      min-height: 1em;
+    }
+
+    /* ── 秘密カードモーダル ── */
+    .secret-modal-box { border-color: #795548; }
+    .secret-modal-box h3 { font-size: 1.3em; margin-bottom: 8px; color: #bcaaa4; }
+    .secret-modal-box .warn-text {
+      font-size: 0.85em;
+      color: #ff9800;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .secret-card {
+      background: #1a1a2e;
+      border: 2px solid #795548;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-size: 1.1em;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 16px;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reveal-btn {
+      padding: 10px 28px;
+      font-size: 0.95em;
+      background: #795548;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .reveal-btn:hover { background: #8d6e63; }
 
     /* ── 共通オーバーレイ ── */
     .overlay {
@@ -335,16 +382,19 @@
       <span class="leader-badge" id="badge-0"></span>
       <span class="para-badge"   id="para-0"></span>
       プレイヤー1
+      <span class="hand-badge"   id="hand-0"></span>
     </div>
     <div class="player-card" data-idx="1">
       <span class="leader-badge" id="badge-1"></span>
       <span class="para-badge"   id="para-1"></span>
       プレイヤー2
+      <span class="hand-badge"   id="hand-1"></span>
     </div>
     <div class="player-card" data-idx="2">
       <span class="leader-badge" id="badge-2"></span>
       <span class="para-badge"   id="para-2"></span>
       プレイヤー3
+      <span class="hand-badge"   id="hand-2"></span>
     </div>
   </div>
 
@@ -357,9 +407,10 @@
 
   <!-- Actions -->
   <div class="actions">
-    <button class="action-btn btn-fish"  id="btn-fish"  onclick="doAction('fish')"  disabled>🐟 釣り<small>食料 +1〜3</small></button>
-    <button class="action-btn btn-water" id="btn-water" onclick="doAction('water')" disabled>💧 水汲み<small id="water-hint">雨量: ?</small></button>
-    <button class="action-btn btn-log"   id="btn-log"   onclick="startLogging()"   disabled>🪵 伐採<small>森へ入る</small></button>
+    <button class="action-btn btn-fish"     id="btn-fish"     onclick="doAction('fish')"  disabled>🐟 釣り<small>食料 +1〜3</small></button>
+    <button class="action-btn btn-water"    id="btn-water"    onclick="doAction('water')" disabled>💧 水汲み<small id="water-hint">雨量: ?</small></button>
+    <button class="action-btn btn-log"      id="btn-log"      onclick="startLogging()"   disabled>🪵 伐採<small>森へ入る</small></button>
+    <button class="action-btn btn-scavenge" id="btn-scavenge" onclick="doScavenge()"     disabled>⚓ 船あさり<small>難破船カードを引く</small></button>
   </div>
 
   <!-- Log -->
@@ -409,6 +460,18 @@
     </div>
   </div>
 
+  <!-- ═══ 船あさり: 秘密カードモーダル ═══ -->
+  <div class="overlay" id="secret-modal" style="display:none">
+    <div class="overlay-box secret-modal-box">
+      <h3>⚓ 難破船カードを引いた！</h3>
+      <p class="warn-text">⚠️ 他のプレイヤーは画面を見ないでください</p>
+      <div class="secret-card" id="secret-card-face" style="display:none"></div>
+      <button class="reveal-btn" id="reveal-btn" onclick="revealCard()">👁 カードを見る</button>
+      <br>
+      <button class="step-btn primary" id="secret-ok-btn" onclick="closeSecretModal()" style="display:none">OK（閉じる）</button>
+    </div>
+  </div>
+
   <!-- ═══ ゲーム終了オーバーレイ ═══ -->
   <div class="overlay" id="end-overlay" style="display:none">
     <div class="overlay-box">
@@ -427,6 +490,8 @@
   <script src="features/snake/snake.js"></script>
   <script src="features/paralysis/paralysis.js"></script>
   <script src="features/rafttrack/rafttrack.js"></script>
+  <script src="features/shipwreck/shipwreck.js"></script>
+  <script src="features/hand/hand.js"></script>
 
   <script>
     const PLAYERS = 3;
@@ -480,6 +545,37 @@
       }
 
       addLog(msg);
+      if (checkWin()) return;
+      advanceTurn();
+    }
+
+    // ─────────────────────────────────────────────
+    //  船あさり
+    // ─────────────────────────────────────────────
+    function doScavenge() {
+      const who = pname(currentPlayerIdx());
+      const card = Shipwreck.draw();
+      Hand.add(currentPlayerIdx(), card);
+      addLog(who + ' が船あさりをして難破船カードを1枚引いた（手札: ' + Hand.count(currentPlayerIdx()) + '枚）', 'scavenge');
+
+      // 秘密カードを本人だけ見せるモーダルを開く
+      document.getElementById('secret-card-face').textContent = '⚓ ' + card.name;
+      document.getElementById('secret-card-face').style.display = 'none';
+      document.getElementById('reveal-btn').style.display = '';
+      document.getElementById('secret-ok-btn').style.display = 'none';
+      enableActions(false);
+      document.getElementById('secret-modal').style.display = 'flex';
+    }
+
+    function revealCard() {
+      document.getElementById('secret-card-face').style.display = 'flex';
+      document.getElementById('reveal-btn').style.display = 'none';
+      document.getElementById('secret-ok-btn').style.display = '';
+    }
+
+    function closeSecretModal() {
+      document.getElementById('secret-modal').style.display = 'none';
+      updateUI();
       if (checkWin()) return;
       advanceTurn();
     }
@@ -688,13 +784,16 @@
 
       document.getElementById('round').textContent = G.round;
 
-      // リーダー・麻痺バッジ
+      // リーダー・麻痺・手札バッジ
       for (let i = 0; i < PLAYERS; i++) {
         document.getElementById('badge-' + i).textContent =
           i === Leader.current ? '👑 リーダー' : '';
         const isParalyzed = Paralysis.isParalyzed(i, G.round);
         document.getElementById('para-' + i).textContent =
           isParalyzed ? '💀 麻痺中' : '';
+        const handCount = Hand.count(i);
+        document.getElementById('hand-' + i).textContent =
+          handCount > 0 ? '🃏 手札 ' + handCount + '枚' : '';
         const card = document.querySelector('.player-card[data-idx="' + i + '"]');
         card.classList.toggle('paralyzed', isParalyzed);
       }
@@ -729,7 +828,7 @@
     }
 
     function enableActions(on) {
-      ['btn-fish', 'btn-water', 'btn-log'].forEach(id => {
+      ['btn-fish', 'btn-water', 'btn-log', 'btn-scavenge'].forEach(id => {
         document.getElementById(id).disabled = !on;
       });
     }
@@ -771,6 +870,8 @@
       Weather.init();
       RaftTrack.init();
       Paralysis.reset();
+      Shipwreck.init();
+      Hand.init(PLAYERS);
       G.turnOrder = Leader.turnOrder();
 
       document.getElementById('end-overlay').style.display = 'none';
@@ -792,6 +893,8 @@
     Weather.init();
     RaftTrack.init();
     Paralysis.reset();
+    Shipwreck.init();
+    Hand.init(PLAYERS);
     G.turnOrder = Leader.turnOrder();
     updateUI();
     addLog(Leader.name() + ' がリーダーに選ばれた！');
