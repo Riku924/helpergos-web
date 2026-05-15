@@ -492,6 +492,7 @@
   <script src="features/rafttrack/rafttrack.js"></script>
   <script src="features/shipwreck/shipwreck.js"></script>
   <script src="features/hand/hand.js"></script>
+  <script src="features/resources/resources.js"></script>
 
   <script>
     const PLAYERS = 3;
@@ -862,8 +863,9 @@
     //  リスタート
     // ─────────────────────────────────────────────
     function restartGame() {
+      const _restart = Resources.getInitial(PLAYERS);
       Object.assign(G, {
-        food: 0, water: 0,
+        food: _restart.food, water: _restart.water,
         round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0,
       });
       Leader.init(PLAYERS);
@@ -884,6 +886,7 @@
       enableActions(false);
       updateUI();
       addLog(Leader.name() + ' がリーダーに選ばれた！');
+      addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
     }
 
     // ─────────────────────────────────────────────
@@ -896,8 +899,12 @@
     Shipwreck.init();
     Hand.init(PLAYERS);
     G.turnOrder = Leader.turnOrder();
+    const _init = Resources.getInitial(PLAYERS);
+    G.food  = _init.food;
+    G.water = _init.water;
     updateUI();
     addLog(Leader.name() + ' がリーダーに選ばれた！');
+    addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
   </script>
 </body>
 </html>
