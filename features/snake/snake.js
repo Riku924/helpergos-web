@@ -5,8 +5,8 @@
  */
 (function () {
   const SnakeBag = {
-    WHITE: 7,
-    BLACK: 3,
+    WHITE: 5,
+    BLACK: 1,
 
     /**
      * n個の玉を引く（引いた後は必ず戻す前提なので毎回全袋から）
