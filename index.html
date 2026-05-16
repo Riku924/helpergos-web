@@ -921,7 +921,42 @@
           <div class="name-inputs" id="name-inputs"></div>
         </div>
 
-        <button class="lobby-start-btn" onclick="startGame()">ゲームスタート！</button>
+        <button class="lobby-start-btn" onclick="startGame()">🏝️ ひとりで / 同じ画面で遊ぶ</button>
+      </div>
+
+      <div class="lobby-box" style="margin-top:0;">
+        <div class="lobby-label" style="font-size:0.9em;color:#ffd700;margin-bottom:14px;">🌐 マルチプレイ（別端末）</div>
+
+        <div class="lobby-section">
+          <div class="lobby-label">あなたの名前</div>
+          <input class="name-input" id="mp-name" type="text" placeholder="プレイヤー名" maxlength="12" style="width:100%;">
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:4px;">
+          <button class="lobby-start-btn" style="flex:1;font-size:0.9em;background:#2196f3;"
+                  onclick="mpCreateRoom()">🔑 ルームを作る</button>
+          <button class="lobby-start-btn" style="flex:1;font-size:0.9em;background:#8bc34a;color:#1a2a00;"
+                  onclick="mpShowJoin()">🔗 ルームに参加</button>
+        </div>
+
+        <div id="mp-join-area" style="display:none;margin-top:10px;">
+          <input class="name-input" id="mp-code" type="text" placeholder="ルームコード (例: AB12)"
+                 maxlength="4" style="width:100%;text-transform:uppercase;">
+          <button class="lobby-start-btn" style="width:100%;margin-top:8px;font-size:0.9em;"
+                  onclick="mpJoinRoom()">参加する</button>
+        </div>
+
+        <div id="mp-waiting" style="display:none;margin-top:14px;text-align:center;">
+          <p style="font-size:0.82em;color:#ffd700;margin-bottom:8px;">
+            ルームコード: <strong id="mp-room-code" style="font-size:1.4em;letter-spacing:0.1em;"></strong>
+          </p>
+          <p style="font-size:0.75em;color:#aaa;margin-bottom:10px;">このコードを他のプレイヤーに教えてください</p>
+          <div id="mp-player-list" style="font-size:0.82em;color:#87ceeb;margin-bottom:12px;line-height:1.8;"></div>
+          <button id="mp-start-btn" class="lobby-start-btn" style="width:100%;"
+                  onclick="mpStartGame()">ゲームスタート！</button>
+        </div>
+
+        <p id="mp-error" style="color:#ff6b6b;font-size:0.8em;margin-top:8px;display:none;"></p>
       </div>
     </div>
   </div>
@@ -979,6 +1014,9 @@
     </div>
   </div>
 
+  <!-- Socket.io (マルチプレイ時のみ使用) -->
+  <script src="/socket.io/socket.io.js"></script>
+
   <!-- Feature modules -->
   <script src="features/leader/leader.js"></script>
   <script src="features/weather/weather.js"></script>
@@ -996,6 +1034,197 @@
   <script>
     let PLAYERS = 3;
     let PLAYER_NAMES = [];
+
+    // ── マルチプレイ ──────────────────────────────
+    let IS_MULTIPLAYER  = false;
+    let MY_PLAYER_INDEX = -1;  // この端末のプレイヤー番号
+    let _socket         = null;
+    let _applyingRemote = false; // 受信イベント処理中フラグ（二重ブロードキャスト防止）
+
+    function mpInitSocket() {
+      if (_socket) return;
+      _socket = io();
+
+      _socket.on('lobby-update', names => {
+        document.getElementById('mp-player-list').textContent =
+          names.map((n, i) => (i === 0 ? '👑 ' : '　') + n).join('\n');
+      });
+
+      _socket.on('room-created', ({ code, playerIndex }) => {
+        MY_PLAYER_INDEX = playerIndex;
+        document.getElementById('mp-room-code').textContent = code;
+        document.getElementById('mp-waiting').style.display = 'block';
+        document.getElementById('mp-error').style.display   = 'none';
+      });
+
+      _socket.on('room-joined', ({ code }) => {
+        document.getElementById('mp-room-code').textContent = code;
+        document.getElementById('mp-waiting').style.display = 'block';
+        document.getElementById('mp-join-area').style.display = 'none';
+        document.getElementById('mp-error').style.display   = 'none';
+      });
+
+      _socket.on('room-error', msg => {
+        var e = document.getElementById('mp-error');
+        e.textContent = msg; e.style.display = 'block';
+      });
+
+      _socket.on('game-start', ({ playerNames }) => {
+        IS_MULTIPLAYER = true;
+        PLAYERS = playerNames.length;
+        PLAYER_NAMES = playerNames;
+        document.getElementById('lobby').style.display = 'none';
+        buildPlayerCards();
+        initGame();
+      });
+
+      // ── ゲームアクション受信 ──
+      _socket.on('game-action', data => {
+        _applyingRemote = true;
+        applyRemoteAction(data);
+        _applyingRemote = false;
+      });
+
+      // ── チャット受信 ──
+      _socket.on('chat-message', ({ fromIndex, text }) => {
+        appendChatMessage(pname(fromIndex), text, false);
+      });
+
+      // ── 秘密メッセージ受信 ──
+      _socket.on('private-message', ({ fromIndex, text }) => {
+        if (!G.privateInbox[MY_PLAYER_INDEX]) G.privateInbox[MY_PLAYER_INDEX] = [];
+        G.privateInbox[MY_PLAYER_INDEX].push({ from: fromIndex, text });
+        updateInboxBadges();
+      });
+
+      _socket.on('player-left', ({ playerIndex }) => {
+        appendChatMessage('', pname(playerIndex) + ' が退出しました', true);
+      });
+    }
+
+    function mpCreateRoom() {
+      mpInitSocket();
+      const name = document.getElementById('mp-name').value.trim() || 'プレイヤー1';
+      _socket.emit('create-room', { playerName: name });
+    }
+
+    function mpShowJoin() {
+      mpInitSocket();
+      document.getElementById('mp-join-area').style.display = 'block';
+    }
+
+    function mpJoinRoom() {
+      const code = document.getElementById('mp-code').value.trim().toUpperCase();
+      const name = document.getElementById('mp-name').value.trim() || 'プレイヤー';
+      if (!code) return;
+      _socket.emit('join-room', { code, playerName: name });
+    }
+
+    function mpStartGame() {
+      if (_socket) _socket.emit('start-game');
+    }
+
+    /** アクションをサーバー経由で全員にブロードキャスト */
+    function broadcastAction(data) {
+      if (IS_MULTIPLAYER && !_applyingRemote && _socket) {
+        _socket.emit('game-action', data);
+      }
+    }
+
+    /** 受信したアクションを適用する */
+    function applyRemoteAction(data) {
+      switch (data.type) {
+        case 'flip-weather':
+          Weather.current = data.result;
+          document.getElementById('weather-icon').textContent = data.icon + ' ' + data.text;
+          document.getElementById('weather-desc').textContent = data.desc;
+          document.getElementById('flip-btn').disabled = true;
+          document.getElementById('water-hint').textContent  = data.waterHint;
+          addLog('リーダー ' + Leader.name() + ' が天候カードをめくった → ' + data.icon + ' ' + data.text, 'weather');
+          G.phase = 'action';
+          enableActions(data.myTurn);
+          checkAndSkipParalyzed();
+          updateUI();
+          break;
+
+        case 'fish':
+          G.food += data.amount;
+          addLog(pname(data.playerIdx) + ' が釣りをして 食料 +' + data.amount + (data.rodBonus ? '（釣竿効果）' : ''));
+          _remoteAdvanceTurn(data);
+          break;
+
+        case 'water':
+          G.water += data.amount;
+          addLog(pname(data.playerIdx) + ' が水を汲んで 水 +' + data.amount + (data.amount === 0 ? ' (雨なし)' : '') + (data.canteenBonus ? '（水筒効果）' : ''));
+          _remoteAdvanceTurn(data);
+          break;
+
+        case 'log-start':
+          RaftTrack.advance(data.guaranteed);
+          updateRaftTrack();
+          break;
+
+        case 'log-result':
+          if (!data.bitten && data.extraWood > 0) { RaftTrack.advance(data.extraWood); updateRaftTrack(); }
+          if (data.bitten) Paralysis.inflict(data.playerIdx, G.round);
+          addLog(pname(data.playerIdx) + (data.bitten ? ' が毒蛇に噛まれた！ 次ラウンド麻痺。' : ' が伐採成功！ いかだトラック +' + (data.guaranteed + data.extraWood)), data.bitten ? 'snake' : 'raft-done');
+          _remoteAdvanceTurn(data);
+          break;
+
+        case 'scavenge':
+          // 手札枚数だけ増やす（カード内容はそのプレイヤーのみが知る）
+          addLog(pname(data.playerIdx) + ' が船あさりをして難破船カードを1枚引いた', 'scavenge');
+          _remoteAdvanceTurn(data);
+          break;
+
+        case 'use-card':
+          if (data.effect === 'water')        G.water += data.amount;
+          else if (data.effect === 'food')    G.food  += data.amount;
+          else if (data.effect === 'raft_complete') { RaftTrack.completed++; updateRaftTrack(); }
+          else if (data.effect === 'convert') { G.food -= data.fromAmount; G.water += data.toAmount; }
+          else if (data.effect === 'water_with_paralysis') { G.water += data.amount; Paralysis.inflict(data.playerIdx, G.round); }
+          else if (data.effect === 'food_with_paralysis')  { G.food  += data.amount; Paralysis.inflict(data.playerIdx, G.round); }
+          addLog(pname(data.playerIdx) + ' が「' + data.cardName + '」を使用！ ' + data.logMsg, 'scavenge');
+          checkWin(); updateUI();
+          break;
+
+        case 'equip-card':
+          Equipped.add(data.playerIdx, data.card);
+          addLog(pname(data.playerIdx) + ' が「' + data.card.name + '」を装備！（全員公開）', 'raft-done');
+          updateUI();
+          break;
+
+        case 'round-end':
+          G.food  = data.food;
+          G.water = data.water;
+          G.round = data.round;
+          addLog('── ラウンド ' + data.prevRound + ' 終了: 食料 -' + data.consumed + '、水 -' + data.consumed + ' ──', 'round-end');
+          if (data.gameOver) { endGame(false); return; }
+          Leader.current  = data.leaderCurrent;
+          G.turnOrder     = data.turnOrder;
+          G.turnIndex     = 0;
+          G.phase         = 'weather';
+          Weather.current = null;
+          document.getElementById('weather-icon').textContent = '──';
+          document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
+          document.getElementById('water-hint').textContent   = '雨量: ?';
+          document.getElementById('flip-btn').disabled = (Leader.current !== MY_PLAYER_INDEX);
+          enableActions(false);
+          updateUI();
+          break;
+      }
+    }
+
+    function _remoteAdvanceTurn(data) {
+      G.turnIndex = data.nextTurnIndex;
+      G.turnOrder = data.turnOrder;
+      if (data.isMyTurn) enableActions(true);
+      else enableActions(false);
+      checkAndSkipParalyzed();
+      checkWin();
+      updateUI();
+    }
+    // ──────────────────────────────────────────────
 
     const G = {
       food: 0, water: 0,
@@ -1027,6 +1256,9 @@
       addLog('リーダー ' + Leader.name() + ' が天候カードをめくった → ' +
              label.icon + ' ' + label.text + ' (' + label.desc + ')', 'weather');
       G.phase = 'action';
+      broadcastAction({ type: 'flip-weather', result: rain, icon: label.icon, text: label.text,
+        desc: label.desc, waterHint: document.getElementById('water-hint').textContent,
+        myTurn: currentPlayerIdx() !== (IS_MULTIPLAYER ? MY_PLAYER_INDEX : -1) });
       enableActions(true);
       checkAndSkipParalyzed();
       updateUI();
@@ -1042,14 +1274,18 @@
       const pIdx = currentPlayerIdx();
       if (type === 'fish') {
         n = FoodAction.fish();
-        if (Equipped.hasEffect(pIdx, 'fish_twice')) { n += FoodAction.fish(); msg = who + ' が釣りをして 食料 +' + n + '（釣竿効果）'; }
-        else { msg = who + ' が釣りをして 食料 +' + n; }
+        const rod = Equipped.hasEffect(pIdx, 'fish_twice');
+        if (rod) n += FoodAction.fish();
+        msg = who + ' が釣りをして 食料 +' + n + (rod ? '（釣竿効果）' : '');
         G.food += n;
+        broadcastAction({ type: 'fish', playerIdx: pIdx, amount: n, rodBonus: rod });
       } else if (type === 'water') {
         n = WaterAction.collect();
-        if (Equipped.hasEffect(pIdx, 'water_twice')) { n *= 2; msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + '（水筒効果）'; }
-        else { msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : ''); }
+        const canteen = Equipped.hasEffect(pIdx, 'water_twice');
+        if (canteen) n *= 2;
+        msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + (canteen ? '（水筒効果）' : '');
         G.water += n;
+        broadcastAction({ type: 'water', playerIdx: pIdx, amount: n, canteenBonus: canteen });
       }
 
       addLog(msg);
@@ -1066,6 +1302,7 @@
       const card = Shipwreck.draw();
       Hand.add(currentPlayerIdx(), card);
       addLog(who + ' が船あさりをして難破船カードを1枚引いた（手札: ' + Hand.count(currentPlayerIdx()) + '枚）', 'scavenge');
+      broadcastAction({ type: 'scavenge', playerIdx: currentPlayerIdx() });
 
       // 秘密カードを本人だけ見せるモーダルを開く
       document.getElementById('secret-card-face').textContent = '⚓ ' + card.name;
@@ -1099,6 +1336,7 @@
       const guaranteed = Equipped.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
       document.getElementById('guaranteed-wood-text').textContent = guaranteed + '本';
       document.getElementById('guaranteed-track-text').textContent = guaranteed;
+      broadcastAction({ type: 'log-start', playerIdx: currentPlayerIdx(), guaranteed });
 
       const newRafts = RaftTrack.advance(guaranteed);
       if (newRafts > 0) {
@@ -1198,6 +1436,11 @@
         addLog(who + ' が伐採成功！ いかだトラック +' + (RaftAction.GUARANTEED + n), 'raft-done');
       }
 
+      const pIdx2 = currentPlayerIdx();
+      const g2 = Hand.hasEffect(pIdx2, 'logging_boost') ? 2 : RaftAction.GUARANTEED;
+      broadcastAction({ type: 'log-result', playerIdx: pIdx2, bitten, extraWood: bitten ? 0 : n,
+        guaranteed: g2, nextTurnIndex: G.turnIndex + 1, turnOrder: G.turnOrder,
+        isMyTurn: false });
       showRaftStep(3);
     }
 
@@ -1224,6 +1467,7 @@
         G.food  -= PLAYERS;
         G.water -= PLAYERS;
         addLog('── ラウンド ' + G.round + ' 終了: 食料 -' + PLAYERS + '、水 -' + PLAYERS + ' ──', 'round-end');
+        const prevRound = G.round;
         G.round++;
 
         if (G.food < 0 || G.water < 0) {
@@ -1239,10 +1483,14 @@
         G.phase      = 'weather';
         Weather.current = null;
 
+        broadcastAction({ type: 'round-end', food: G.food, water: G.water, round: G.round,
+          prevRound, consumed: PLAYERS, gameOver: false,
+          leaderCurrent: Leader.current, turnOrder: G.turnOrder });
+
         document.getElementById('weather-icon').textContent = '──';
         document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
         document.getElementById('water-hint').textContent   = '雨量: ?';
-        document.getElementById('flip-btn').disabled = false;
+        document.getElementById('flip-btn').disabled = IS_MULTIPLAYER && Leader.current !== MY_PLAYER_INDEX;
         enableActions(false);
         updateUI();
         return;
@@ -1358,8 +1606,10 @@
     }
 
     function enableActions(on) {
+      // マルチプレイ中は自分のターンのみ有効
+      const allow = on && (!IS_MULTIPLAYER || MY_PLAYER_INDEX === currentPlayerIdx());
       ['btn-fish', 'btn-water', 'btn-log', 'btn-scavenge'].forEach(id => {
-        document.getElementById(id).disabled = !on;
+        document.getElementById(id).disabled = !allow;
       });
     }
 
@@ -1642,13 +1892,18 @@
       document.getElementById('chat-text').focus();
 
       if (recipientIdx >= 0 && recipientIdx !== senderIdx) {
-        // 秘密チャット：ログにもモーダルにも表示せず受信トレイへ直接格納
-        if (!G.privateInbox[recipientIdx]) G.privateInbox[recipientIdx] = [];
-        G.privateInbox[recipientIdx].push({ from: senderIdx, text: text });
-        updateInboxBadges();
+        // 秘密チャット
+        if (IS_MULTIPLAYER && _socket) {
+          _socket.emit('private-message', { toIndex: recipientIdx, text });
+        } else {
+          if (!G.privateInbox[recipientIdx]) G.privateInbox[recipientIdx] = [];
+          G.privateInbox[recipientIdx].push({ from: senderIdx, text });
+          updateInboxBadges();
+        }
       } else {
         // 全員宛の公開メッセージ
         appendChatMessage(pname(senderIdx), text, false);
+        if (IS_MULTIPLAYER && _socket) _socket.emit('chat-message', { text });
       }
     }
 
