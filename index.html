@@ -1634,10 +1634,7 @@
       document.getElementById('chat-text').focus();
 
       if (recipientIdx >= 0 && recipientIdx !== senderIdx) {
-        // 秘密チャット：ログには内容を伏せて記録し、受信モーダルを表示
-        appendChatMessage(null,
-          '🔒 ' + pname(senderIdx) + ' → ' + pname(recipientIdx) + ': 秘密メッセージ',
-          true);
+        // 秘密チャット：ログには何も残さずモーダルのみ表示
         openPrivateChatModal(senderIdx, recipientIdx, text);
       } else {
         // 全員宛の公開メッセージ
