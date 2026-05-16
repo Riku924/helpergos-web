@@ -285,13 +285,8 @@
       gap: 6px;
       flex-shrink: 0;
     }
-    #chat-selects {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    #chat-arrow { font-size: 0.75em; color: #aaa; }
-    #chat-sender, #chat-recipient {
+    #chat-selects { display: flex; }
+    #chat-recipient {
       flex: 1;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.2);
@@ -299,11 +294,10 @@
       color: #fff;
       font-size: 0.72em;
       font-family: inherit;
-      padding: 4px 4px;
+      padding: 4px 6px;
       outline: none;
-      min-width: 0;
     }
-    #chat-sender option, #chat-recipient option { background: #1a3a5c; color: #fff; }
+    #chat-recipient option { background: #1a3a5c; color: #fff; }
     #chat-recipient.private { border-color: #87ceeb; }
     #chat-text {
       background: rgba(255,255,255,0.08);
@@ -944,8 +938,6 @@
     <div id="chat-log"></div>
     <div id="chat-input-area">
       <div id="chat-selects">
-        <select id="chat-sender" title="送信者"></select>
-        <span id="chat-arrow">→</span>
         <select id="chat-recipient" title="宛先"></select>
       </div>
       <input id="chat-text" type="text" placeholder="メッセージを入力…" maxlength="100"
@@ -1351,6 +1343,7 @@
         G.phase !== 'weather' || Weather.current !== null;
 
       updateHandPanel();
+      updateChatSenderSelect();
     }
 
     function updateRaftTrack() {
@@ -1599,39 +1592,40 @@
     // ─────────────────────────────────────────────
     //  チャット
     // ─────────────────────────────────────────────
+    /** 現在の「自分」インデックス（送信者）を返す */
+    function currentChatSender() {
+      if (G.phase === 'action' && G.turnOrder && G.turnOrder.length > 0) {
+        return currentPlayerIdx();
+      }
+      return Leader.current;
+    }
+
     function updateChatSenderSelect() {
-      var senderSel    = document.getElementById('chat-sender');
       var recipientSel = document.getElementById('chat-recipient');
-      if (!senderSel || !recipientSel) return;
+      if (!recipientSel) return;
 
-      var prevSender    = senderSel.value;
-      var prevRecipient = recipientSel.value;
+      var prev = recipientSel.value;
+      var selfIdx = currentChatSender();
 
-      senderSel.innerHTML = '';
       recipientSel.innerHTML = '';
 
-      // 宛先に「全員」を追加
+      // 「全員」は常に先頭
       var allOpt = document.createElement('option');
       allOpt.value = -1;
       allOpt.textContent = '全員';
       recipientSel.appendChild(allOpt);
 
+      // 自分以外のプレイヤーのみ追加
       for (var i = 0; i < PLAYERS; i++) {
-        var sOpt = document.createElement('option');
-        sOpt.value = i;
-        sOpt.textContent = pname(i);
-        senderSel.appendChild(sOpt);
-
-        var rOpt = document.createElement('option');
-        rOpt.value = i;
-        rOpt.textContent = pname(i);
-        recipientSel.appendChild(rOpt);
+        if (i === selfIdx) continue;
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = pname(i);
+        recipientSel.appendChild(opt);
       }
 
-      if (prevSender !== '' && parseInt(prevSender) < PLAYERS) senderSel.value = prevSender;
-      if (prevRecipient !== '') recipientSel.value = prevRecipient;
+      if (prev !== '' && prev !== String(selfIdx)) recipientSel.value = prev;
 
-      // 宛先が特定プレイヤーのときスタイル変更
       recipientSel.onchange = function () {
         recipientSel.classList.toggle('private', parseInt(recipientSel.value) >= 0);
       };
@@ -1641,7 +1635,7 @@
       var text = document.getElementById('chat-text').value.trim();
       if (!text) return;
 
-      var senderIdx    = parseInt(document.getElementById('chat-sender').value);
+      var senderIdx    = currentChatSender();
       var recipientIdx = parseInt(document.getElementById('chat-recipient').value);
 
       document.getElementById('chat-text').value = '';
