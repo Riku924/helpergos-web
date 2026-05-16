@@ -193,6 +193,59 @@
     .hand-use-btn:hover:not(:disabled) { background: #ffe44d; }
     .hand-use-btn:disabled { background: #444; color: #666; cursor: default; }
     .hand-empty { font-size: 0.8em; color: #555; text-align: center; padding: 24px 0; }
+    /* プレイヤータブ */
+    .hand-player-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .hand-tab-btn {
+      padding: 3px 8px;
+      font-size: 0.72em;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 5px;
+      background: transparent;
+      color: #aaa;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .hand-tab-btn:hover  { border-color: #87ceeb; color: #87ceeb; }
+    .hand-tab-btn.active { border-color: #ffd700; background: rgba(255,215,0,0.15); color: #ffd700; }
+    /* 渡すボタン */
+    .hand-give-btn {
+      padding: 4px 10px;
+      font-size: 0.72em;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 5px;
+      color: #aaa;
+      cursor: pointer;
+      font-family: inherit;
+      margin-left: 4px;
+      transition: all 0.15s;
+    }
+    .hand-give-btn:hover { border-color: #87ceeb; color: #87ceeb; }
+    /* カード操作ボタン行 */
+    .hand-card-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+    /* 転送モーダル */
+    .transfer-modal-box { border-color: #87ceeb; }
+    .transfer-modal-box h3 { font-size: 1.2em; color: #87ceeb; margin-bottom: 8px; }
+    .transfer-targets { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+    .transfer-target-btn {
+      padding: 10px 16px;
+      font-size: 0.95em;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .transfer-target-btn:hover { border-color: #87ceeb; background: rgba(135,206,235,0.15); }
     /* 装備中カード表示（全員公開） */
     .equip-display { margin-top: 4px; min-height: 0; }
     .equip-chip {
@@ -665,8 +718,20 @@
   <!-- ═══ 手札パネル（右固定） ═══ -->
   <div class="hand-panel" id="hand-panel">
     <div class="hand-panel-title">🃏 手札</div>
+    <div class="hand-player-tabs" id="hand-player-tabs"></div>
     <div class="hand-panel-player" id="hand-panel-player">—</div>
     <div id="hand-cards-list"></div>
+  </div>
+
+  <!-- ═══ カード転送モーダル ═══ -->
+  <div class="overlay" id="transfer-modal" style="display:none">
+    <div class="overlay-box transfer-modal-box">
+      <h3>🤝 カードを渡す</h3>
+      <p class="warn-text">⚠️ 他のプレイヤーは画面を見ないでください</p>
+      <p id="transfer-card-name" style="font-size:0.95em;color:#fff;margin-bottom:4px;"></p>
+      <div class="transfer-targets" id="transfer-targets"></div>
+      <button class="step-btn cancel" onclick="closeTransferModal()">キャンセル</button>
+    </div>
   </div>
 
   <!-- ═══ ゲーム終了オーバーレイ ═══ -->
@@ -704,6 +769,7 @@
       turnIndex: 0,
       selectedCount: 0,       // 伐採モーダルで選択中の本数
       extraActionThisTurn: false, // コーヒー使用時の追加アクションフラグ
+      handPlayer: 0,              // 手札パネルで表示中のプレイヤーインデックス
     };
 
     function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
@@ -1092,17 +1158,12 @@
     }
 
     function canUseCard(card, playerIdx) {
-      if (G.phase !== 'action') return false;
-      if (currentPlayerIdx() !== playerIdx) return false;
-      if (G.extraActionThisTurn) return false;
-      // 装備カードは「装備する」アクションとして使用可能
-      if (card.type === 'equipment') return true;
-      if (['useless','reaction','ammo'].includes(card.type)) return false;
-      if (card.type === 'round_end') return false;
-      if (card.type === 'special' && card.timing === 'round_start') return false;
-      if (card.type === 'modifier') return false;
+      if (G.phase === 'ended') return false;
+      if (card.type === 'useless' || card.effect === 'none') return false;
+      if (card.type === 'ammo') return false;       // 銃との組み合わせ操作は別途
+      if (card.type === 'modifier') return false;   // 複合操作は別途
       if (card.effect === 'convert' && G.food < card.fromAmount) return false;
-      return true;
+      return true; // いつでも使用可能
     }
 
     function applyCardEffect(card, playerIdx) {
@@ -1138,8 +1199,8 @@
       }
     }
 
-    function useCard(cardId) {
-      const pIdx = currentPlayerIdx();
+    function useCard(cardId, playerIdx) {
+      const pIdx = (playerIdx !== undefined) ? playerIdx : G.handPlayer;
       const card = Hand.get(pIdx).find(function (c) { return c.id === cardId; });
       if (!card) return;
 
@@ -1147,10 +1208,9 @@
       if (card.type === 'equipment') {
         Hand.remove(pIdx, cardId);
         Equipped.add(pIdx, card);
-        addLog(pname(pIdx) + ' が「' + card.name + '」を装備した！（全員から見える）', 'raft-done');
-        if (checkWin()) return;
-        advanceTurn();
-        return;
+        addLog(pname(pIdx) + ' が「' + card.name + '」を装備！（全員公開）', 'raft-done');
+        updateUI();
+        return; // アクション消費なし
       }
 
       const result = applyCardEffect(card, pIdx);
@@ -1165,14 +1225,27 @@
         return;
       }
 
-      if (checkWin()) return;
-      advanceTurn();
+      checkWin();
+      updateUI(); // アクション消費なし
     }
 
     function updateHandPanel() {
-      const pIdx = G.phase === 'action' ? currentPlayerIdx() : Leader.current;
+      const pIdx   = G.handPlayer;
       const playerEl = document.getElementById('hand-panel-player');
       const listEl   = document.getElementById('hand-cards-list');
+      const tabsEl   = document.getElementById('hand-player-tabs');
+
+      // タブ更新
+      tabsEl.innerHTML = '';
+      for (let i = 0; i < PLAYERS; i++) {
+        (function (idx) {
+          const btn = document.createElement('button');
+          btn.className = 'hand-tab-btn' + (idx === pIdx ? ' active' : '');
+          btn.textContent = pname(idx);
+          btn.onclick = function () { G.handPlayer = idx; updateHandPanel(); };
+          tabsEl.appendChild(btn);
+        })(i);
+      }
 
       if (G.phase === 'ended') {
         playerEl.textContent = '—';
@@ -1203,39 +1276,94 @@
         descEl.textContent = getCardDesc(card);
         div.appendChild(descEl);
 
+        const actEl = document.createElement('div');
+        actEl.className = 'hand-card-actions';
+
         if (card.type === 'useless' || card.effect === 'none') {
           const b = document.createElement('div');
           b.className = 'hand-card-badge unusable';
           b.textContent = '使用不可';
-          div.appendChild(b);
-        } else if (['reaction','ammo','modifier'].includes(card.type) ||
-                   card.type === 'round_end' ||
-                   (card.type === 'special' && card.timing === 'round_start') ||
-                   card.effect === 'eliminate') {
+          actEl.appendChild(b);
+        } else if (['ammo','modifier'].includes(card.type)) {
           const b = document.createElement('div');
           b.className = 'hand-card-badge reaction';
+          b.textContent = card.type === 'ammo' ? '銃と組み合わせて使用' : '複合カード';
+          actEl.appendChild(b);
+        } else if (['reaction'].includes(card.type) ||
+                   card.type === 'round_end' ||
+                   (card.type === 'special' && card.timing === 'round_start')) {
           const timingMap = {
-            'round_end':   'ラウンド終了時',
-            'round_start': 'ラウンド開始時',
-            'on_vote':     '投票フェーズ',
-            'on_shot':     '撃たれた瞬間',
+            'round_end':    'ラウンド終了時',
+            'round_start':  'ラウンド開始時',
+            'on_vote':      '投票フェーズ',
+            'on_shot':      '撃たれた瞬間',
             'on_snake_bite':'蛇噛まれ時',
             'before_action':'アクション開始前',
           };
-          b.textContent = timingMap[card.timing] || (card.type === 'ammo' ? '銃と組み合わせて使用' : '特定タイミングで使用');
-          div.appendChild(b);
+          const b = document.createElement('div');
+          b.className = 'hand-card-badge reaction';
+          b.textContent = timingMap[card.timing] || '特定タイミングで使用';
+          actEl.appendChild(b);
         } else {
           const usable = canUseCard(card, pIdx);
-          const btn = document.createElement('button');
-          btn.className = 'hand-use-btn';
-          btn.textContent = card.type === 'equipment' ? '装備する' : '使う';
-          btn.disabled = !usable;
-          if (usable) btn.onclick = function () { useCard(card.id); };
-          div.appendChild(btn);
+          const useBtn = document.createElement('button');
+          useBtn.className = 'hand-use-btn';
+          useBtn.textContent = card.type === 'equipment' ? '装備する' : '使う';
+          useBtn.disabled = !usable;
+          if (usable) useBtn.onclick = (function (cid, pi) { return function () { useCard(cid, pi); }; })(card.id, pIdx);
+          actEl.appendChild(useBtn);
         }
 
+        // 渡すボタン（ゲーム中・手札があれば常に表示）
+        if (G.phase !== 'ended' && PLAYERS > 1) {
+          const giveBtn = document.createElement('button');
+          giveBtn.className = 'hand-give-btn';
+          giveBtn.textContent = '渡す';
+          giveBtn.onclick = (function (cid, pi) { return function () { openTransferModal(cid, pi); }; })(card.id, pIdx);
+          actEl.appendChild(giveBtn);
+        }
+
+        div.appendChild(actEl);
         listEl.appendChild(div);
       });
+    }
+
+    // ─── カード転送 ───
+    var _transferCardId = null;
+    var _transferFrom   = -1;
+
+    function openTransferModal(cardId, fromIdx) {
+      _transferCardId = cardId;
+      _transferFrom   = fromIdx;
+      const card = Hand.get(fromIdx).find(function (c) { return c.id === cardId; });
+      document.getElementById('transfer-card-name').textContent = '「' + (card ? card.name : '?') + '」を渡す相手を選んでください';
+      const targets = document.getElementById('transfer-targets');
+      targets.innerHTML = '';
+      for (var i = 0; i < PLAYERS; i++) {
+        if (i === fromIdx) continue;
+        (function (toIdx) {
+          const btn = document.createElement('button');
+          btn.className = 'transfer-target-btn';
+          btn.textContent = pname(toIdx) + ' に渡す';
+          btn.onclick = function () { doTransfer(toIdx); };
+          targets.appendChild(btn);
+        })(i);
+      }
+      document.getElementById('transfer-modal').style.display = 'flex';
+    }
+
+    function doTransfer(toIdx) {
+      const card = Hand.get(_transferFrom).find(function (c) { return c.id === _transferCardId; });
+      if (!card) { closeTransferModal(); return; }
+      Hand.remove(_transferFrom, _transferCardId);
+      Hand.add(toIdx, card);
+      addLog(pname(_transferFrom) + ' が「' + card.name + '」を ' + pname(toIdx) + ' に渡した', 'scavenge');
+      closeTransferModal();
+      updateUI();
+    }
+
+    function closeTransferModal() {
+      document.getElementById('transfer-modal').style.display = 'none';
     }
 
     // ─────────────────────────────────────────────
@@ -1276,6 +1404,7 @@
     //  プレイヤーカード動的生成
     // ─────────────────────────────────────────────
     function buildPlayerCards() {
+      G.handPlayer = 0;
       const container = document.getElementById('players');
       container.innerHTML = '';
       for (let i = 0; i < PLAYERS; i++) {
