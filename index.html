@@ -272,17 +272,26 @@
       gap: 6px;
       flex-shrink: 0;
     }
-    #chat-sender {
+    #chat-selects {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #chat-arrow { font-size: 0.75em; color: #aaa; }
+    #chat-sender, #chat-recipient {
+      flex: 1;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 5px;
       color: #fff;
-      font-size: 0.78em;
+      font-size: 0.72em;
       font-family: inherit;
-      padding: 4px 6px;
+      padding: 4px 4px;
       outline: none;
+      min-width: 0;
     }
-    #chat-sender option { background: #1a3a5c; color: #fff; }
+    #chat-sender option, #chat-recipient option { background: #1a3a5c; color: #fff; }
+    #chat-recipient.private { border-color: #87ceeb; }
     #chat-text {
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.2);
@@ -921,10 +930,27 @@
     <div id="chat-title">💬 チャット</div>
     <div id="chat-log"></div>
     <div id="chat-input-area">
-      <select id="chat-sender"></select>
+      <div id="chat-selects">
+        <select id="chat-sender" title="送信者"></select>
+        <span id="chat-arrow">→</span>
+        <select id="chat-recipient" title="宛先"></select>
+      </div>
       <input id="chat-text" type="text" placeholder="メッセージを入力…" maxlength="100"
-             onkeydown="if(event.key==='Enter') sendChatMessage()">
+             onkeydown="if(event.key==='Enter'){ sendChatMessage(); event.preventDefault(); }">
       <button id="chat-send-btn" onclick="sendChatMessage()">送信</button>
+    </div>
+  </div>
+
+  <!-- ═══ 秘密チャットモーダル ═══ -->
+  <div class="overlay" id="private-chat-modal" style="display:none">
+    <div class="overlay-box" style="border-color:#87ceeb;max-width:340px;">
+      <h3 style="font-size:1.2em;color:#87ceeb;margin-bottom:8px;">🔒 秘密メッセージ</h3>
+      <p id="private-chat-header" class="warn-text" style="font-size:0.82em;color:#ff9800;margin-bottom:12px;"></p>
+      <div id="private-chat-content" style="display:none;background:rgba(255,255,255,0.07);border-radius:8px;padding:12px;font-size:0.9em;margin-bottom:14px;line-height:1.5;"></div>
+      <div id="private-chat-gate">
+        <button class="step-btn primary" style="width:100%;" onclick="revealPrivateChat()">👁 メッセージを見る</button>
+      </div>
+      <button class="step-btn cancel" style="width:100%;margin-top:8px;" onclick="closePrivateChatModal()">閉じる</button>
     </div>
   </div>
 
@@ -1560,39 +1586,75 @@
     //  チャット
     // ─────────────────────────────────────────────
     function updateChatSenderSelect() {
-      const sel = document.getElementById('chat-sender');
-      if (!sel) return;
-      const current = sel.value;
-      sel.innerHTML = '';
-      for (let i = 0; i < PLAYERS; i++) {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = pname(i);
-        sel.appendChild(opt);
+      var senderSel    = document.getElementById('chat-sender');
+      var recipientSel = document.getElementById('chat-recipient');
+      if (!senderSel || !recipientSel) return;
+
+      var prevSender    = senderSel.value;
+      var prevRecipient = recipientSel.value;
+
+      senderSel.innerHTML = '';
+      recipientSel.innerHTML = '';
+
+      // 宛先に「全員」を追加
+      var allOpt = document.createElement('option');
+      allOpt.value = -1;
+      allOpt.textContent = '全員';
+      recipientSel.appendChild(allOpt);
+
+      for (var i = 0; i < PLAYERS; i++) {
+        var sOpt = document.createElement('option');
+        sOpt.value = i;
+        sOpt.textContent = pname(i);
+        senderSel.appendChild(sOpt);
+
+        var rOpt = document.createElement('option');
+        rOpt.value = i;
+        rOpt.textContent = pname(i);
+        recipientSel.appendChild(rOpt);
       }
-      if (current !== '' && current < PLAYERS) sel.value = current;
+
+      if (prevSender !== '' && parseInt(prevSender) < PLAYERS) senderSel.value = prevSender;
+      if (prevRecipient !== '') recipientSel.value = prevRecipient;
+
+      // 宛先が特定プレイヤーのときスタイル変更
+      recipientSel.onchange = function () {
+        recipientSel.classList.toggle('private', parseInt(recipientSel.value) >= 0);
+      };
     }
 
     function sendChatMessage() {
-      const text = document.getElementById('chat-text').value.trim();
+      var text = document.getElementById('chat-text').value.trim();
       if (!text) return;
-      const senderIdx = parseInt(document.getElementById('chat-sender').value);
-      const name = pname(senderIdx);
-      appendChatMessage(name, text, false);
+
+      var senderIdx    = parseInt(document.getElementById('chat-sender').value);
+      var recipientIdx = parseInt(document.getElementById('chat-recipient').value);
+
       document.getElementById('chat-text').value = '';
       document.getElementById('chat-text').focus();
+
+      if (recipientIdx >= 0 && recipientIdx !== senderIdx) {
+        // 秘密チャット：ログには内容を伏せて記録し、受信モーダルを表示
+        appendChatMessage(null,
+          '🔒 ' + pname(senderIdx) + ' → ' + pname(recipientIdx) + ': 秘密メッセージ',
+          true);
+        openPrivateChatModal(senderIdx, recipientIdx, text);
+      } else {
+        // 全員宛の公開メッセージ
+        appendChatMessage(pname(senderIdx), text, false);
+      }
     }
 
     function appendChatMessage(sender, text, isSystem) {
-      const log = document.getElementById('chat-log');
+      var log = document.getElementById('chat-log');
       if (!log) return;
-      const div = document.createElement('div');
+      var div = document.createElement('div');
       if (isSystem) {
         div.className = 'chat-msg chat-msg-system';
         div.textContent = text;
       } else {
         div.className = 'chat-msg';
-        const s = document.createElement('span');
+        var s = document.createElement('span');
         s.className = 'chat-msg-sender';
         s.textContent = sender + ':';
         div.appendChild(s);
@@ -1600,6 +1662,29 @@
       }
       log.appendChild(div);
       log.scrollTop = log.scrollHeight;
+    }
+
+    // ─── 秘密チャットモーダル ───
+    var _privateChatText = '';
+
+    function openPrivateChatModal(senderIdx, recipientIdx, text) {
+      _privateChatText = text;
+      document.getElementById('private-chat-header').textContent =
+        pname(recipientIdx) + ' さんへのメッセージです。他のプレイヤーは目を閉じてください。';
+      document.getElementById('private-chat-content').style.display = 'none';
+      document.getElementById('private-chat-content').textContent = text;
+      document.getElementById('private-chat-gate').style.display = '';
+      document.getElementById('private-chat-modal').style.display = 'flex';
+    }
+
+    function revealPrivateChat() {
+      document.getElementById('private-chat-content').style.display = 'block';
+      document.getElementById('private-chat-gate').style.display = 'none';
+    }
+
+    function closePrivateChatModal() {
+      document.getElementById('private-chat-modal').style.display = 'none';
+      _privateChatText = '';
     }
 
     // ─── カード転送 ───
