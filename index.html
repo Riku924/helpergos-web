@@ -19,6 +19,112 @@
       gap: 14px;
     }
 
+    /* ── ロビー ── */
+    #lobby {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(160deg, #0a1f33 0%, #112840 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .lobby-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .lobby-title { font-size: 2.8em; color: #ffd700; letter-spacing: 0.06em; }
+    .lobby-sub   { color: #87ceeb; font-size: 0.9em; }
+    .lobby-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .lobby-label {
+      font-size: 0.82em;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    /* 人数グリッド */
+    .count-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .count-btn {
+      width: 46px;
+      height: 46px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: transparent;
+      color: #fff;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .count-btn:hover  { border-color: #ffd700; color: #ffd700; }
+    .count-btn.active { border-color: #ffd700; background: rgba(255,215,0,0.18); color: #ffd700; }
+    /* 名前入力 */
+    .name-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .name-label {
+      font-size: 0.82em;
+      color: #87ceeb;
+      min-width: 90px;
+    }
+    .name-input {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 10px;
+      font-size: 0.88em;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .name-input:focus { border-color: #87ceeb; }
+    .name-input::placeholder { color: #555; }
+    /* スタートボタン */
+    .lobby-start-btn {
+      padding: 14px;
+      font-size: 1.1em;
+      font-weight: bold;
+      font-family: inherit;
+      background: #ffd700;
+      color: #1a2a00;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .lobby-start-btn:hover  { background: #ffe44d; transform: translateY(-2px); }
+    .lobby-start-btn:active { transform: translateY(0); }
+
     /* ── 手札パネル ── */
     .hand-panel {
       position: fixed;
@@ -457,30 +563,8 @@
     <button class="flip-btn" id="flip-btn" onclick="flipWeather()">🂠 カードをめくる</button>
   </div>
 
-  <!-- Players -->
-  <div class="players" id="players">
-    <div class="player-card" data-idx="0">
-      <span class="leader-badge" id="badge-0"></span>
-      <span class="para-badge"   id="para-0"></span>
-      プレイヤー1
-      <span class="hand-badge"   id="hand-0"></span>
-      <div class="equip-display"  id="equip-0"></div>
-    </div>
-    <div class="player-card" data-idx="1">
-      <span class="leader-badge" id="badge-1"></span>
-      <span class="para-badge"   id="para-1"></span>
-      プレイヤー2
-      <span class="hand-badge"   id="hand-1"></span>
-      <div class="equip-display"  id="equip-1"></div>
-    </div>
-    <div class="player-card" data-idx="2">
-      <span class="leader-badge" id="badge-2"></span>
-      <span class="para-badge"   id="para-2"></span>
-      プレイヤー3
-      <span class="hand-badge"   id="hand-2"></span>
-      <div class="equip-display"  id="equip-2"></div>
-    </div>
-  </div>
+  <!-- Players（動的生成） -->
+  <div class="players" id="players"></div>
 
   <!-- Turn info -->
   <div class="turn-info">
@@ -556,6 +640,28 @@
     </div>
   </div>
 
+  <!-- ═══ ロビー画面 ═══ -->
+  <div id="lobby">
+    <div class="lobby-inner">
+      <h1 class="lobby-title">🏝️ ヘルパゴス</h1>
+      <p class="lobby-sub">無人島からの脱出を目指すサバイバルゲーム</p>
+
+      <div class="lobby-box">
+        <div class="lobby-section">
+          <div class="lobby-label">何人で遊びますか？</div>
+          <div class="count-grid" id="count-grid"></div>
+        </div>
+
+        <div class="lobby-section">
+          <div class="lobby-label">プレイヤー名（省略可）</div>
+          <div class="name-inputs" id="name-inputs"></div>
+        </div>
+
+        <button class="lobby-start-btn" onclick="startGame()">ゲームスタート！</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ 手札パネル（右固定） ═══ -->
   <div class="hand-panel" id="hand-panel">
     <div class="hand-panel-title">🃏 手札</div>
@@ -587,7 +693,8 @@
   <script src="features/resources/resources.js"></script>
 
   <script>
-    const PLAYERS = 3;
+    let PLAYERS = 3;
+    let PLAYER_NAMES = [];
 
     const G = {
       food: 0, water: 0,
@@ -600,7 +707,7 @@
     };
 
     function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
-    function pname(i) { return 'プレイヤー' + (i + 1); }
+    function pname(i) { return PLAYER_NAMES[i] || ('プレイヤー' + (i + 1)); }
 
     // ─────────────────────────────────────────────
     //  天候カード
@@ -1160,11 +1267,95 @@
     //  リスタート
     // ─────────────────────────────────────────────
     function restartGame() {
-      const _restart = Resources.getInitial(PLAYERS);
-      Object.assign(G, {
-        food: _restart.food, water: _restart.water,
-        round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0, extraActionThisTurn: false,
-      });
+      document.getElementById('end-overlay').style.display = 'none';
+      // ロビーに戻る
+      document.getElementById('lobby').style.display = 'flex';
+    }
+
+    // ─────────────────────────────────────────────
+    //  プレイヤーカード動的生成
+    // ─────────────────────────────────────────────
+    function buildPlayerCards() {
+      const container = document.getElementById('players');
+      container.innerHTML = '';
+      for (let i = 0; i < PLAYERS; i++) {
+        const div = document.createElement('div');
+        div.className = 'player-card';
+        div.setAttribute('data-idx', i);
+        div.innerHTML =
+          '<span class="leader-badge" id="badge-' + i + '"></span>' +
+          '<span class="para-badge"   id="para-'  + i + '"></span>' +
+          pname(i) +
+          '<span class="hand-badge"   id="hand-'  + i + '"></span>' +
+          '<div class="equip-display" id="equip-'  + i + '"></div>';
+        container.appendChild(div);
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    //  ロビー
+    // ─────────────────────────────────────────────
+    (function initLobby() {
+      var selectedCount = 3;
+      var grid = document.getElementById('count-grid');
+
+      // 人数ボタン生成（3〜12）
+      for (var n = 3; n <= 12; n++) {
+        (function (num) {
+          var btn = document.createElement('button');
+          btn.className = 'count-btn' + (num === 3 ? ' active' : '');
+          btn.textContent = num;
+          btn.onclick = function () {
+            selectedCount = num;
+            document.querySelectorAll('.count-btn').forEach(function (b) {
+              b.classList.toggle('active', parseInt(b.textContent) === num);
+            });
+            buildNameInputs(num);
+          };
+          grid.appendChild(btn);
+        })(n);
+      }
+
+      // 名前入力欄生成
+      function buildNameInputs(count) {
+        var container = document.getElementById('name-inputs');
+        container.innerHTML = '';
+        for (var i = 0; i < count; i++) {
+          var row = document.createElement('div');
+          row.className = 'name-row';
+          var label = document.createElement('span');
+          label.className = 'name-label';
+          label.textContent = 'プレイヤー' + (i + 1);
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'name-input';
+          input.placeholder = 'プレイヤー' + (i + 1);
+          input.maxLength = 12;
+          row.appendChild(label);
+          row.appendChild(input);
+          container.appendChild(row);
+        }
+      }
+      buildNameInputs(3);
+
+      window.startGame = function () {
+        // 人数と名前を確定
+        PLAYERS = selectedCount;
+        PLAYER_NAMES = [];
+        document.querySelectorAll('.name-input').forEach(function (inp, i) {
+          PLAYER_NAMES.push(inp.value.trim() || ('プレイヤー' + (i + 1)));
+        });
+        // ロビーを隠してゲーム初期化
+        document.getElementById('lobby').style.display = 'none';
+        buildPlayerCards();
+        initGame();
+      };
+    })();
+
+    // ─────────────────────────────────────────────
+    //  初期化
+    // ─────────────────────────────────────────────
+    function initGame() {
       Leader.init(PLAYERS);
       Weather.init();
       RaftTrack.init();
@@ -1172,50 +1363,28 @@
       Shipwreck.init();
       Hand.init(PLAYERS);
       Equipped.init(PLAYERS);
+      Object.assign(G, {
+        round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0, extraActionThisTurn: false,
+      });
       G.turnOrder = Leader.turnOrder();
-      // 初期手札を配る
-      const _rCPP = Shipwreck.initialCardsPerPlayer(PLAYERS);
-      Shipwreck.dealInitial(PLAYERS, _rCPP).forEach(function (cards, i) {
+      var res = Resources.getInitial(PLAYERS);
+      G.food  = res.food;
+      G.water = res.water;
+      var cpp = Shipwreck.initialCardsPerPlayer(PLAYERS);
+      Shipwreck.dealInitial(PLAYERS, cpp).forEach(function (cards, i) {
         cards.forEach(function (c) { Hand.add(i, c); });
       });
-
-      document.getElementById('end-overlay').style.display = 'none';
       document.getElementById('flip-btn').disabled = false;
       document.getElementById('weather-icon').textContent = '──';
       document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
       document.getElementById('water-hint').textContent   = '雨量: ?';
-      document.getElementById('log').innerHTML =
-        '<div class="log-entry">ゲーム開始！ 3人で力を合わせて脱出しよう。</div>';
+      document.getElementById('log').innerHTML = '<div class="log-entry">ゲーム開始！ 力を合わせて脱出しよう。</div>';
       enableActions(false);
       updateUI();
       addLog(Leader.name() + ' がリーダーに選ばれた！');
       addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
-      addLog('難破船カードを各自 ' + _rCPP + ' 枚配りました。');
+      addLog('難破船カードを各自 ' + cpp + ' 枚配りました。');
     }
-
-    // ─────────────────────────────────────────────
-    //  初期化
-    // ─────────────────────────────────────────────
-    Leader.init(PLAYERS);
-    Weather.init();
-    RaftTrack.init();
-    Paralysis.reset();
-    Shipwreck.init();
-    Hand.init(PLAYERS);
-    Equipped.init(PLAYERS);
-    G.turnOrder = Leader.turnOrder();
-    const _init = Resources.getInitial(PLAYERS);
-    G.food  = _init.food;
-    G.water = _init.water;
-    // 初期手札を配る
-    const _initCPP = Shipwreck.initialCardsPerPlayer(PLAYERS);
-    Shipwreck.dealInitial(PLAYERS, _initCPP).forEach(function (cards, i) {
-      cards.forEach(function (c) { Hand.add(i, c); });
-    });
-    updateUI();
-    addLog(Leader.name() + ' がリーダーに選ばれた！');
-    addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
-    addLog('難破船カードを各自 ' + _initCPP + ' 枚配りました。');
   </script>
 </body>
 </html>
