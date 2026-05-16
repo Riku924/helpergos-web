@@ -474,6 +474,94 @@
     h1 { font-size: 2em; color: #ffd700; letter-spacing: 0.05em; }
     .subtitle { color: #87ceeb; font-size: 0.85em; }
 
+    /* ══════════════════════════════════════════
+       スマホ用レスポンシブ（768px 以下）
+    ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      body {
+        padding: 12px 8px 72px; /* 下タブバー分の余白 */
+      }
+      h1 { font-size: 1.5em; }
+
+      /* サイドパネルをフルスクリーンオーバーレイに変更 */
+      #status-panel,
+      #chat-panel {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        z-index: 200;
+        display: none; /* 初期非表示 */
+        padding-top: 48px; /* 閉じるボタン分 */
+      }
+      #status-panel.sp-open,
+      #chat-panel.sp-open { display: flex !important; flex-direction: column; }
+
+      /* パネル内の閉じるボタン */
+      .sp-close-btn {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 44px;
+        background: rgba(0,0,0,0.6);
+        border: none;
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+        color: #fff;
+        font-size: 0.85em;
+        font-family: inherit;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .sp-close-btn:hover { background: rgba(255,255,255,0.1); }
+
+      /* 下タブバー */
+      #mobile-tab-bar {
+        display: flex !important;
+      }
+
+      /* PC用の余白は不要 */
+      .resources { gap: 10px; padding: 10px 12px; }
+      .actions   { gap: 8px; }
+      .action-btn { padding: 10px 12px; font-size: 0.82em; }
+
+      /* チャットパネルを縦いっぱいに */
+      #chat-panel { overflow: hidden; }
+      #chat-log   { flex: 1; }
+    }
+
+    /* 下タブバー（PCでは非表示） */
+    #mobile-tab-bar {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 58px;
+      background: rgba(0,0,0,0.85);
+      border-top: 1px solid rgba(255,255,255,0.12);
+      z-index: 150;
+    }
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #aaa;
+      font-size: 0.72em;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      transition: color 0.15s;
+      padding: 4px 0;
+    }
+    .tab-btn .tab-icon { font-size: 1.5em; }
+    .tab-btn:hover,
+    .tab-btn.active { color: #ffd700; }
+
     /* ── Resources ── */
     .resources {
       display: flex;
@@ -963,12 +1051,14 @@
 
   <!-- ═══ 左パネル（プレイヤー状態・装備） ═══ -->
   <div id="status-panel">
+    <button class="sp-close-btn" onclick="closeMobilePanel('status')">✕ 閉じる</button>
     <div id="status-panel-title">👥 プレイヤー</div>
   </div>
 
   <!-- ═══ 手札パネル（右固定） ═══ -->
   <!-- ═══ チャットパネル（右固定） ═══ -->
   <div id="chat-panel">
+    <button class="sp-close-btn" onclick="closeMobilePanel('chat')">✕ 閉じる</button>
     <div id="chat-title">💬 チャット</div>
     <div id="chat-log"></div>
     <div id="chat-input-area">
@@ -1003,6 +1093,19 @@
       <div class="transfer-targets" id="transfer-targets"></div>
       <button class="step-btn cancel" onclick="closeTransferModal()">キャンセル</button>
     </div>
+  </div>
+
+  <!-- ═══ スマホ用下タブバー ═══ -->
+  <div id="mobile-tab-bar">
+    <button class="tab-btn" id="tab-status" onclick="toggleMobilePanel('status')">
+      <span class="tab-icon">👥</span>プレイヤー
+    </button>
+    <button class="tab-btn" id="tab-hand" onclick="toggleMobilePanel('hand')">
+      <span class="tab-icon">🃏</span>手札
+    </button>
+    <button class="tab-btn" id="tab-chat" onclick="toggleMobilePanel('chat')">
+      <span class="tab-icon">💬</span>チャット
+    </button>
   </div>
 
   <!-- ═══ ゲーム終了オーバーレイ ═══ -->
@@ -2050,6 +2153,44 @@
     // ─────────────────────────────────────────────
     //  プレイヤーカード動的生成
     // ─────────────────────────────────────────────
+    // ─── スマホ用パネル切替 ───────────────────────
+    function toggleMobilePanel(name) {
+      var panels = { status: 'status-panel', chat: 'chat-panel' };
+      var tabs   = { status: 'tab-status', chat: 'tab-chat', hand: 'tab-hand' };
+
+      if (name === 'hand') {
+        // 手札はロビー非表示のときのみ、自分のプレイヤーのインライン手札をトグル
+        var myIdx = IS_MULTIPLAYER ? MY_PLAYER_INDEX : 0;
+        toggleInlineHand(myIdx);
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('tab-hand').classList.add('active');
+        return;
+      }
+
+      var panelId = panels[name];
+      var panel = document.getElementById(panelId);
+      var isOpen = panel.classList.contains('sp-open');
+
+      // 全パネルを閉じる
+      Object.values(panels).forEach(function(id) {
+        document.getElementById(id).classList.remove('sp-open');
+      });
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+
+      if (!isOpen) {
+        panel.classList.add('sp-open');
+        document.getElementById(tabs[name]).classList.add('active');
+      }
+    }
+
+    function closeMobilePanel(name) {
+      var ids = { status: 'status-panel', chat: 'chat-panel' };
+      var tabIds = { status: 'tab-status', chat: 'tab-chat' };
+      if (ids[name]) document.getElementById(ids[name]).classList.remove('sp-open');
+      if (tabIds[name]) document.getElementById(tabIds[name]).classList.remove('active');
+    }
+    // ─────────────────────────────────────────────
+
     function buildPlayerCards() {
       G.handPlayer = 0;
       G.handRevealed = false;
