@@ -1096,12 +1096,7 @@
         descEl.textContent = getCardDesc(card);
         div.appendChild(descEl);
 
-        if (card.type === 'equipment') {
-          const b = document.createElement('div');
-          b.className = 'hand-card-badge equipped';
-          b.textContent = '⚙️ 装備中（自動適用）';
-          div.appendChild(b);
-        } else if (card.type === 'useless' || card.effect === 'none') {
+        if (card.type === 'useless' || card.effect === 'none') {
           const b = document.createElement('div');
           b.className = 'hand-card-badge unusable';
           b.textContent = '使用不可';
