@@ -15,9 +15,78 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 16px;
+      padding: 20px 250px 20px 16px;
       gap: 14px;
     }
+
+    /* ── 手札パネル ── */
+    .hand-panel {
+      position: fixed;
+      right: 0; top: 0;
+      width: 234px;
+      height: 100vh;
+      background: rgba(0,0,0,0.55);
+      border-left: 1px solid rgba(255,255,255,0.12);
+      overflow-y: auto;
+      padding: 16px 12px;
+      z-index: 50;
+    }
+    .hand-panel-title {
+      font-size: 0.88em;
+      font-weight: bold;
+      color: #ffd700;
+      margin-bottom: 4px;
+    }
+    .hand-panel-player {
+      font-size: 0.78em;
+      color: #87ceeb;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .hand-card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+    }
+    .hand-card-name {
+      font-size: 0.88em;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+    .hand-card-desc {
+      font-size: 0.7em;
+      color: #aaa;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .hand-card-badge {
+      font-size: 0.7em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .hand-card-badge.equipped  { background: rgba(139,195,74,0.2);  color: #8bc34a; }
+    .hand-card-badge.unusable  { background: rgba(100,100,100,0.3); color: #777; }
+    .hand-card-badge.reaction  { background: rgba(255,152,0,0.2);   color: #ff9800; }
+    .hand-card-badge.pending   { background: rgba(33,150,243,0.2);  color: #64b5f6; }
+    .hand-use-btn {
+      padding: 4px 14px;
+      font-size: 0.78em;
+      background: #ffd700;
+      color: #1a2a00;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+      transition: background 0.15s;
+    }
+    .hand-use-btn:hover:not(:disabled) { background: #ffe44d; }
+    .hand-use-btn:disabled { background: #444; color: #666; cursor: default; }
+    .hand-empty { font-size: 0.8em; color: #555; text-align: center; padding: 24px 0; }
 
     h1 { font-size: 2em; color: #ffd700; letter-spacing: 0.05em; }
     .subtitle { color: #87ceeb; font-size: 0.85em; }
@@ -426,8 +495,8 @@
       <div id="raft-step1">
         <h3>🪵 伐採</h3>
         <p class="info-text">
-          森の入り口で木材を<span class="bold-green">1本</span>確保した！<br>
-          いかだトラック +1<br>
+          森の入り口で木材を<span class="bold-green" id="guaranteed-wood-text">1本</span>確保した！<br>
+          いかだトラック +<span id="guaranteed-track-text">1</span><br>
           <br>
           毒蛇だらけの森の奥へ進みますか？
         </p>
@@ -472,6 +541,13 @@
     </div>
   </div>
 
+  <!-- ═══ 手札パネル（右固定） ═══ -->
+  <div class="hand-panel" id="hand-panel">
+    <div class="hand-panel-title">🃏 手札</div>
+    <div class="hand-panel-player" id="hand-panel-player">—</div>
+    <div id="hand-cards-list"></div>
+  </div>
+
   <!-- ═══ ゲーム終了オーバーレイ ═══ -->
   <div class="overlay" id="end-overlay" style="display:none">
     <div class="overlay-box">
@@ -500,10 +576,11 @@
     const G = {
       food: 0, water: 0,
       round: 1,
-      phase: 'weather',   // 'weather' | 'action' | 'ended'
+      phase: 'weather',       // 'weather' | 'action' | 'ended'
       turnOrder: [],
       turnIndex: 0,
-      selectedCount: 0,   // 伐採モーダルで選択中の本数
+      selectedCount: 0,       // 伐採モーダルで選択中の本数
+      extraActionThisTurn: false, // コーヒー使用時の追加アクションフラグ
     };
 
     function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
@@ -535,18 +612,22 @@
       let n = 0, msg = '';
       const who = pname(currentPlayerIdx());
 
+      const pIdx = currentPlayerIdx();
       if (type === 'fish') {
         n = FoodAction.fish();
+        if (Hand.hasEffect(pIdx, 'fish_twice')) { n += FoodAction.fish(); msg = who + ' が釣りをして 食料 +' + n + '（釣竿効果）'; }
+        else { msg = who + ' が釣りをして 食料 +' + n; }
         G.food += n;
-        msg = who + ' が釣りをして 食料 +' + n;
       } else if (type === 'water') {
         n = WaterAction.collect();
+        if (Hand.hasEffect(pIdx, 'water_twice')) { n *= 2; msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + '（水筒効果）'; }
+        else { msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : ''); }
         G.water += n;
-        msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '');
       }
 
       addLog(msg);
       if (checkWin()) return;
+      if (G.extraActionThisTurn) { G.extraActionThisTurn = false; enableActions(true); updateUI(); return; }
       advanceTurn();
     }
 
@@ -587,14 +668,17 @@
     function startLogging() {
       enableActions(false);
 
-      // 入り口の1本を確保してトラックを進める
-      const newRafts = RaftTrack.advance(RaftAction.GUARANTEED);
+      // 斧装備なら入り口の保証木材が2本になる
+      const guaranteed = Hand.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
+      document.getElementById('guaranteed-wood-text').textContent = guaranteed + '本';
+      document.getElementById('guaranteed-track-text').textContent = guaranteed;
+
+      const newRafts = RaftTrack.advance(guaranteed);
       if (newRafts > 0) {
         addLog('いかだ完成！ いかだカードを ' + newRafts + ' 枚獲得！', 'raft-done');
       }
       updateRaftTrack();
 
-      // モーダルをStep1で開く
       showRaftStep(1);
       document.getElementById('raft-modal').style.display = 'flex';
     }
@@ -605,7 +689,8 @@
     function chooseDeeper(goDeeper) {
       if (!goDeeper) {
         // やめる → モーダルを閉じてターン終了
-        addLog(pname(currentPlayerIdx()) + ' は森の入り口で引き返した。いかだトラック +1');
+        const g = Hand.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
+        addLog(pname(currentPlayerIdx()) + ' は森の入り口で引き返した。いかだトラック +' + g);
         document.getElementById('raft-modal').style.display = 'none';
         if (checkWin()) return;
         advanceTurn();
@@ -816,6 +901,8 @@
 
       document.getElementById('flip-btn').disabled =
         G.phase !== 'weather' || Weather.current !== null;
+
+      updateHandPanel();
     }
 
     function updateRaftTrack() {
@@ -832,6 +919,184 @@
     function enableActions(on) {
       ['btn-fish', 'btn-water', 'btn-log', 'btn-scavenge'].forEach(id => {
         document.getElementById(id).disabled = !on;
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    //  手札パネル
+    // ─────────────────────────────────────────────
+    function getCardDesc(card) {
+      switch (card.effect) {
+        case 'water':               return '水 +' + card.amount;
+        case 'food':                return '食料 +' + card.amount;
+        case 'raft_complete':       return '完成いかだ +1（トラック位置そのまま）';
+        case 'convert':             return card.from + ' -' + card.fromAmount + ' → 水 +' + card.toAmount;
+        case 'water_with_paralysis':return '水 +' + card.amount + '（次ラウンド麻痺）';
+        case 'food_with_paralysis': return '食料 +' + card.amount + '（次ラウンド麻痺）';
+        case 'fish_twice':          return '釣り2回分（装備・自動適用）';
+        case 'water_twice':         return '水汲み2倍（装備・自動適用）';
+        case 'logging_boost':       return '入り口の木材+2（装備・自動適用）';
+        case 'double_vote':         return '自分の票が2票分（装備・自動適用）';
+        case 'vote_last':           return '投票で最後に投票（装備・自動適用）';
+        case 'round_sustain':       return 'このラウンドの消費を免除（ラウンド終了時に食料・水=0）';
+        case 'food_from_deaths':    return 'ラウンド終了時: 死亡者数×2の食料';
+        case 'eliminate':           return '弾丸と組み合わせて対象を排除（装備）';
+        case 'fire':                return '銃と組み合わせて発射';
+        case 'steal':               return '最大3人の手札から1枚ずつ盗む';
+        case 'set_next_leader':     return '次のラウンドのリーダーを指定';
+        case 'peek_deck':           return '難破船山札の上から' + card.peekCount + '枚を確認';
+        case 'peek_weather':        return '天候山札の上から' + card.peekCount + '枚を確認';
+        case 'peek_hand':           return '任意の1人の手札を全て確認';
+        case 'force_action':        return '他プレイヤーのアクションを強制（反応タイミング）';
+        case 'negate_paralysis':    return '蛇噛まれ時に麻痺を無効化（反応タイミング）';
+        case 'vote_immunity':       return '投票で脱落しない・最多票で再投票（反応タイミング）';
+        case 'block_bullet':        return '銃弾1発を防ぐ（反応タイミング）';
+        case 'revive':              return 'ラウンド開始時: 死亡者1人を蘇生';
+        case 'extra_action':        return '今の手番にアクションを追加で1回';
+        case 'purify':              return '濁った水/腐った魚を浄化して使用';
+        case 'none':                return '効果なし';
+        default:                    return card.effect || '?';
+      }
+    }
+
+    function canUseCard(card, playerIdx) {
+      if (G.phase !== 'action') return false;
+      if (currentPlayerIdx() !== playerIdx) return false;
+      if (G.extraActionThisTurn) return false; // 追加アクション中はカード使用不可
+      if (['useless','equipment','reaction','ammo'].includes(card.type)) return false;
+      if (card.type === 'round_end') return false;
+      if (card.type === 'special' && card.timing === 'round_start') return false;
+      if (card.type === 'modifier') return false; // 複合使用は別フロー
+      if (card.effect === 'eliminate') return false; // 銃は弾丸との組み合わせ
+      if (card.effect === 'convert' && G.food < card.fromAmount) return false;
+      return true;
+    }
+
+    function applyCardEffect(card, playerIdx) {
+      switch (card.effect) {
+        case 'water':
+          G.water += card.amount;
+          return '水 +' + card.amount;
+        case 'food':
+          G.food += card.amount;
+          return '食料 +' + card.amount;
+        case 'raft_complete':
+          RaftTrack.completed++;
+          updateRaftTrack();
+          return '完成いかだ +1';
+        case 'convert':
+          G.food  -= card.fromAmount;
+          G.water += card.toAmount;
+          return '食料 -' + card.fromAmount + '、水 +' + card.toAmount;
+        case 'water_with_paralysis':
+          G.water += card.amount;
+          Paralysis.inflict(playerIdx, G.round);
+          addLog('⚠️ 汚染された水を飲んだ！ 次ラウンド麻痺。', 'snake');
+          return '水 +' + card.amount + '（次ラウンド麻痺）';
+        case 'food_with_paralysis':
+          G.food += card.amount;
+          Paralysis.inflict(playerIdx, G.round);
+          addLog('⚠️ 腐った食料を食べた！ 次ラウンド麻痺。', 'snake');
+          return '食料 +' + card.amount + '（次ラウンド麻痺）';
+        case 'extra_action':
+          return '__extra__'; // 特殊処理: ターンを進めない
+        default:
+          return null;
+      }
+    }
+
+    function useCard(cardId) {
+      const pIdx = currentPlayerIdx();
+      const card = Hand.get(pIdx).find(function (c) { return c.id === cardId; });
+      if (!card) return;
+
+      const result = applyCardEffect(card, pIdx);
+      if (result === null) return;
+
+      Hand.remove(pIdx, cardId);
+      addLog(pname(pIdx) + ' が「' + card.name + '」を使用！ ' + (result === '__extra__' ? '追加アクション獲得！' : result), 'scavenge');
+
+      if (result === '__extra__') {
+        G.extraActionThisTurn = true;
+        updateUI();
+        return;
+      }
+
+      if (checkWin()) return;
+      advanceTurn();
+    }
+
+    function updateHandPanel() {
+      const pIdx = G.phase === 'action' ? currentPlayerIdx() : Leader.current;
+      const playerEl = document.getElementById('hand-panel-player');
+      const listEl   = document.getElementById('hand-cards-list');
+
+      if (G.phase === 'ended') {
+        playerEl.textContent = '—';
+        listEl.innerHTML = '';
+        return;
+      }
+
+      playerEl.textContent = pname(pIdx) + ' の手札';
+
+      const cards = Hand.get(pIdx);
+      if (cards.length === 0) {
+        listEl.innerHTML = '<div class="hand-empty">手札なし</div>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      cards.forEach(function (card) {
+        const div = document.createElement('div');
+        div.className = 'hand-card';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'hand-card-name';
+        nameEl.textContent = card.name;
+        div.appendChild(nameEl);
+
+        const descEl = document.createElement('div');
+        descEl.className = 'hand-card-desc';
+        descEl.textContent = getCardDesc(card);
+        div.appendChild(descEl);
+
+        if (card.type === 'equipment') {
+          const b = document.createElement('div');
+          b.className = 'hand-card-badge equipped';
+          b.textContent = '⚙️ 装備中（自動適用）';
+          div.appendChild(b);
+        } else if (card.type === 'useless' || card.effect === 'none') {
+          const b = document.createElement('div');
+          b.className = 'hand-card-badge unusable';
+          b.textContent = '使用不可';
+          div.appendChild(b);
+        } else if (['reaction','ammo','modifier'].includes(card.type) ||
+                   card.type === 'round_end' ||
+                   (card.type === 'special' && card.timing === 'round_start') ||
+                   card.effect === 'eliminate') {
+          const b = document.createElement('div');
+          b.className = 'hand-card-badge reaction';
+          const timingMap = {
+            'round_end':   'ラウンド終了時',
+            'round_start': 'ラウンド開始時',
+            'on_vote':     '投票フェーズ',
+            'on_shot':     '撃たれた瞬間',
+            'on_snake_bite':'蛇噛まれ時',
+            'before_action':'アクション開始前',
+          };
+          b.textContent = timingMap[card.timing] || (card.type === 'ammo' ? '銃と組み合わせて使用' : '特定タイミングで使用');
+          div.appendChild(b);
+        } else {
+          const usable = canUseCard(card, pIdx);
+          const btn = document.createElement('button');
+          btn.className = 'hand-use-btn';
+          btn.textContent = '使う';
+          btn.disabled = !usable;
+          if (usable) btn.onclick = function () { useCard(card.id); };
+          div.appendChild(btn);
+        }
+
+        listEl.appendChild(div);
       });
     }
 
@@ -867,7 +1132,7 @@
       const _restart = Resources.getInitial(PLAYERS);
       Object.assign(G, {
         food: _restart.food, water: _restart.water,
-        round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0,
+        round: 1, phase: 'weather', turnIndex: 0, selectedCount: 0, extraActionThisTurn: false,
       });
       Leader.init(PLAYERS);
       Weather.init();

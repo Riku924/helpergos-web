@@ -30,6 +30,18 @@
       return (this.cards[playerIdx] || []).length;
     },
 
+    /** 指定カードを手札から1枚取り除く */
+    remove: function (playerIdx, cardId) {
+      const hand = this.cards[playerIdx] || [];
+      const idx = hand.findIndex(function (c) { return c.id === cardId; });
+      if (idx !== -1) hand.splice(idx, 1);
+    },
+
+    /** 指定 effect を持つカードを所持しているか */
+    hasEffect: function (playerIdx, effectKey) {
+      return (this.cards[playerIdx] || []).some(function (c) { return c.effect === effectKey; });
+    },
+
     reset: function () {
       Object.keys(this.cards).forEach(i => { this.cards[i] = []; });
     },
