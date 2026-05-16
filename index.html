@@ -225,31 +225,88 @@
     .lobby-start-btn:hover  { background: #ffe44d; transform: translateY(-2px); }
     .lobby-start-btn:active { transform: translateY(0); }
 
-    /* ── 手札パネル ── */
-    .hand-panel {
+    /* ── チャットパネル ── */
+    #chat-panel {
       position: fixed;
       right: 0; top: 0;
       width: 234px;
       height: 100vh;
       background: rgba(0,0,0,0.55);
       border-left: 1px solid rgba(255,255,255,0.12);
-      overflow-y: auto;
-      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
       z-index: 50;
     }
-    .hand-panel-title {
+    #chat-title {
       font-size: 0.88em;
       font-weight: bold;
       color: #ffd700;
-      margin-bottom: 4px;
-    }
-    .hand-panel-player {
-      font-size: 0.78em;
-      color: #87ceeb;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
+      padding: 14px 12px 8px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      flex-shrink: 0;
     }
+    #chat-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chat-msg {
+      font-size: 0.78em;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .chat-msg-sender {
+      font-weight: bold;
+      color: #87ceeb;
+      margin-right: 4px;
+    }
+    .chat-msg-system { color: #aaa; font-style: italic; }
+    #chat-input-area {
+      padding: 8px 10px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    #chat-sender {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 5px;
+      color: #fff;
+      font-size: 0.78em;
+      font-family: inherit;
+      padding: 4px 6px;
+      outline: none;
+    }
+    #chat-sender option { background: #1a3a5c; color: #fff; }
+    #chat-text {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 5px;
+      color: #fff;
+      font-size: 0.78em;
+      font-family: inherit;
+      padding: 5px 8px;
+      outline: none;
+    }
+    #chat-text::placeholder { color: #555; }
+    #chat-text:focus { border-color: #87ceeb; }
+    #chat-send-btn {
+      padding: 6px;
+      background: #ffd700;
+      color: #1a2a00;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.78em;
+      font-family: inherit;
+      font-weight: bold;
+    }
+    #chat-send-btn:hover { background: #ffe44d; }
     .hand-card {
       background: rgba(255,255,255,0.07);
       border: 1px solid rgba(255,255,255,0.12);
@@ -859,10 +916,16 @@
   </div>
 
   <!-- ═══ 手札パネル（右固定） ═══ -->
-  <div class="hand-panel" id="hand-panel">
-    <div class="hand-panel-title">🃏 手札</div>
-    <div class="hand-panel-player" id="hand-panel-player">—</div>
-    <div id="hand-cards-list"></div>
+  <!-- ═══ チャットパネル（右固定） ═══ -->
+  <div id="chat-panel">
+    <div id="chat-title">💬 チャット</div>
+    <div id="chat-log"></div>
+    <div id="chat-input-area">
+      <select id="chat-sender"></select>
+      <input id="chat-text" type="text" placeholder="メッセージを入力…" maxlength="100"
+             onkeydown="if(event.key==='Enter') sendChatMessage()">
+      <button id="chat-send-btn" onclick="sendChatMessage()">送信</button>
+    </div>
   </div>
 
   <!-- ═══ カード転送モーダル ═══ -->
@@ -1489,137 +1552,54 @@
     }
 
     function updateHandPanel() {
-      const pIdx   = G.handPlayer;
-      const playerEl = document.getElementById('hand-panel-player');
-      const listEl   = document.getElementById('hand-cards-list');
-      const tabsEl   = document.getElementById('hand-player-tabs');
+      // 右パネルはチャットに変更。送信者ドロップダウンのみ更新する
+      updateChatSenderSelect();
+    }
 
-      // タブ更新（要素が存在する場合のみ）
-      if (tabsEl) {
-        tabsEl.innerHTML = '';
-        for (let i = 0; i < PLAYERS; i++) {
-          (function (idx) {
-            const btn = document.createElement('button');
-            btn.className = 'hand-tab-btn' + (idx === pIdx ? ' active' : '');
-            btn.textContent = pname(idx);
-            btn.onclick = function () {
-              G.handPlayer = idx;
-              G.handRevealed = false;
-              updateHandPanel();
-            };
-            tabsEl.appendChild(btn);
-          })(i);
-        }
+    // ─────────────────────────────────────────────
+    //  チャット
+    // ─────────────────────────────────────────────
+    function updateChatSenderSelect() {
+      const sel = document.getElementById('chat-sender');
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '';
+      for (let i = 0; i < PLAYERS; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = pname(i);
+        sel.appendChild(opt);
       }
+      if (current !== '' && current < PLAYERS) sel.value = current;
+    }
 
-      if (G.phase === 'ended') {
-        playerEl.textContent = '—';
-        listEl.innerHTML = '';
-        return;
+    function sendChatMessage() {
+      const text = document.getElementById('chat-text').value.trim();
+      if (!text) return;
+      const senderIdx = parseInt(document.getElementById('chat-sender').value);
+      const name = pname(senderIdx);
+      appendChatMessage(name, text, false);
+      document.getElementById('chat-text').value = '';
+      document.getElementById('chat-text').focus();
+    }
+
+    function appendChatMessage(sender, text, isSystem) {
+      const log = document.getElementById('chat-log');
+      if (!log) return;
+      const div = document.createElement('div');
+      if (isSystem) {
+        div.className = 'chat-msg chat-msg-system';
+        div.textContent = text;
+      } else {
+        div.className = 'chat-msg';
+        const s = document.createElement('span');
+        s.className = 'chat-msg-sender';
+        s.textContent = sender + ':';
+        div.appendChild(s);
+        div.appendChild(document.createTextNode(' ' + text));
       }
-
-      playerEl.textContent = pname(pIdx) + ' の手札';
-
-      // プライバシーゲート：未確認なら隠す
-      if (!G.handRevealed) {
-        listEl.innerHTML = '';
-        const gate = document.createElement('div');
-        gate.className = 'hand-privacy-gate';
-        const warn = document.createElement('p');
-        warn.className = 'hand-privacy-warn';
-        warn.textContent = '⚠️ 他のプレイヤーは\n画面を見ないでください';
-        warn.style.whiteSpace = 'pre-line';
-        const revBtn = document.createElement('button');
-        revBtn.className = 'hand-reveal-btn';
-        revBtn.textContent = '👁 手札を見る';
-        revBtn.onclick = function () { G.handRevealed = true; updateHandPanel(); };
-        gate.appendChild(warn);
-        gate.appendChild(revBtn);
-        listEl.appendChild(gate);
-        return;
-      }
-
-      const cards = Hand.get(pIdx);
-      listEl.innerHTML = '';
-
-      // 手札を隠すボタン
-      const hideBtn = document.createElement('button');
-      hideBtn.className = 'hand-hide-btn';
-      hideBtn.textContent = '🙈 手札を隠す';
-      hideBtn.onclick = function () { G.handRevealed = false; updateHandPanel(); };
-      listEl.appendChild(hideBtn);
-
-      if (cards.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'hand-empty';
-        empty.textContent = '手札なし';
-        listEl.appendChild(empty);
-        return;
-      }
-      cards.forEach(function (card) {
-        const div = document.createElement('div');
-        div.className = 'hand-card';
-
-        const nameEl = document.createElement('div');
-        nameEl.className = 'hand-card-name';
-        nameEl.textContent = card.name;
-        div.appendChild(nameEl);
-
-        const descEl = document.createElement('div');
-        descEl.className = 'hand-card-desc';
-        descEl.textContent = getCardDesc(card);
-        div.appendChild(descEl);
-
-        const actEl = document.createElement('div');
-        actEl.className = 'hand-card-actions';
-
-        if (card.type === 'useless' || card.effect === 'none') {
-          const b = document.createElement('div');
-          b.className = 'hand-card-badge unusable';
-          b.textContent = '使用不可';
-          actEl.appendChild(b);
-        } else if (['ammo','modifier'].includes(card.type)) {
-          const b = document.createElement('div');
-          b.className = 'hand-card-badge reaction';
-          b.textContent = card.type === 'ammo' ? '銃と組み合わせて使用' : '複合カード';
-          actEl.appendChild(b);
-        } else if (['reaction'].includes(card.type) ||
-                   card.type === 'round_end' ||
-                   (card.type === 'special' && card.timing === 'round_start')) {
-          const timingMap = {
-            'round_end':    'ラウンド終了時',
-            'round_start':  'ラウンド開始時',
-            'on_vote':      '投票フェーズ',
-            'on_shot':      '撃たれた瞬間',
-            'on_snake_bite':'蛇噛まれ時',
-            'before_action':'アクション開始前',
-          };
-          const b = document.createElement('div');
-          b.className = 'hand-card-badge reaction';
-          b.textContent = timingMap[card.timing] || '特定タイミングで使用';
-          actEl.appendChild(b);
-        } else {
-          const usable = canUseCard(card, pIdx);
-          const useBtn = document.createElement('button');
-          useBtn.className = 'hand-use-btn';
-          useBtn.textContent = card.type === 'equipment' ? '装備する' : '使う';
-          useBtn.disabled = !usable;
-          if (usable) useBtn.onclick = (function (cid, pi) { return function () { useCard(cid, pi); }; })(card.id, pIdx);
-          actEl.appendChild(useBtn);
-        }
-
-        // 渡すボタン（ゲーム中・手札があれば常に表示）
-        if (G.phase !== 'ended' && PLAYERS > 1) {
-          const giveBtn = document.createElement('button');
-          giveBtn.className = 'hand-give-btn';
-          giveBtn.textContent = '渡す';
-          giveBtn.onclick = (function (cid, pi) { return function () { openTransferModal(cid, pi); }; })(card.id, pIdx);
-          actEl.appendChild(giveBtn);
-        }
-
-        div.appendChild(actEl);
-        listEl.appendChild(div);
-      });
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
     }
 
     // ─── カード転送 ───
@@ -1819,11 +1799,16 @@
       document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
       document.getElementById('water-hint').textContent   = '雨量: ?';
       document.getElementById('log').innerHTML = '<div class="log-entry">ゲーム開始！ 力を合わせて脱出しよう。</div>';
+      // チャット初期化
+      var chatLog = document.getElementById('chat-log');
+      if (chatLog) chatLog.innerHTML = '';
+      updateChatSenderSelect();
       enableActions(false);
       updateUI();
       addLog(Leader.name() + ' がリーダーに選ばれた！');
       addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
       addLog('難破船カードを各自 ' + cpp + ' 枚配りました。');
+      appendChatMessage('', 'ゲーム開始！交渉・宣言はこちらで', true);
     }
   </script>
 </body>
