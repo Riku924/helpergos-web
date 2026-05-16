@@ -15,9 +15,53 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 250px 20px 16px;
+      padding: 20px 250px 20px 216px;
       gap: 14px;
     }
+
+    /* ── 左パネル（プレイヤー状態・装備） ── */
+    #status-panel {
+      position: fixed;
+      left: 0; top: 0;
+      width: 200px;
+      height: 100vh;
+      background: rgba(0,0,0,0.55);
+      border-right: 1px solid rgba(255,255,255,0.12);
+      overflow-y: auto;
+      padding: 14px 10px;
+      z-index: 50;
+    }
+    #status-panel-title {
+      font-size: 0.78em;
+      color: #aaa;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .status-player {
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .status-player:hover    { border-color: rgba(255,255,255,0.2); }
+    .status-player.active   { border-color: #ffd700; background: rgba(255,215,0,0.12); }
+    .status-player.paralyzed{ border-color: #9c27b0; background: rgba(156,39,176,0.12); opacity: 0.8; }
+    .status-player-name     { font-size: 0.9em; font-weight: bold; margin-bottom: 3px; }
+    .status-badges          { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 4px; }
+    .status-badge {
+      font-size: 0.65em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.1);
+    }
+    .status-badge.leader   { background: rgba(255,215,0,0.25);   color: #ffd700; }
+    .status-badge.para     { background: rgba(156,39,176,0.25);  color: #ce93d8; }
+    .status-badge.hand     { background: rgba(255,255,255,0.1);  color: #ccc; }
+    .status-equips         { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; }
 
     /* ── ロビー ── */
     #lobby {
@@ -193,6 +237,45 @@
     .hand-use-btn:hover:not(:disabled) { background: #ffe44d; }
     .hand-use-btn:disabled { background: #444; color: #666; cursor: default; }
     .hand-empty { font-size: 0.8em; color: #555; text-align: center; padding: 24px 0; }
+    /* プライバシーゲート */
+    .hand-privacy-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 8px;
+      text-align: center;
+    }
+    .hand-privacy-warn {
+      font-size: 0.78em;
+      color: #ff9800;
+      line-height: 1.5;
+    }
+    .hand-reveal-btn {
+      padding: 8px 18px;
+      font-size: 0.85em;
+      background: #ffd700;
+      color: #1a2a00;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+    }
+    .hand-reveal-btn:hover { background: #ffe44d; }
+    .hand-hide-btn {
+      padding: 4px 12px;
+      font-size: 0.75em;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #aaa;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 6px;
+      width: 100%;
+    }
+    .hand-hide-btn:hover { border-color: #ff9800; color: #ff9800; }
     /* プレイヤータブ */
     .hand-player-tabs {
       display: flex;
@@ -616,8 +699,7 @@
     <button class="flip-btn" id="flip-btn" onclick="flipWeather()">🂠 カードをめくる</button>
   </div>
 
-  <!-- Players（動的生成） -->
-  <div class="players" id="players"></div>
+  <!-- Players（左パネルに移動したため非表示） -->
 
   <!-- Turn info -->
   <div class="turn-info">
@@ -715,10 +797,14 @@
     </div>
   </div>
 
+  <!-- ═══ 左パネル（プレイヤー状態・装備） ═══ -->
+  <div id="status-panel">
+    <div id="status-panel-title">👥 プレイヤー</div>
+  </div>
+
   <!-- ═══ 手札パネル（右固定） ═══ -->
   <div class="hand-panel" id="hand-panel">
     <div class="hand-panel-title">🃏 手札</div>
-    <div class="hand-player-tabs" id="hand-player-tabs"></div>
     <div class="hand-panel-player" id="hand-panel-player">—</div>
     <div id="hand-cards-list"></div>
   </div>
@@ -770,6 +856,7 @@
       selectedCount: 0,       // 伐採モーダルで選択中の本数
       extraActionThisTurn: false, // コーヒー使用時の追加アクションフラグ
       handPlayer: 0,              // 手札パネルで表示中のプレイヤーインデックス
+      handRevealed: false,        // 手札が表示中かどうか
     };
 
     function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
@@ -1060,34 +1147,38 @@
 
       document.getElementById('round').textContent = G.round;
 
-      // リーダー・麻痺・手札・装備バッジ
-      for (let i = 0; i < PLAYERS; i++) {
-        document.getElementById('badge-' + i).textContent =
-          i === Leader.current ? '👑 リーダー' : '';
-        const isParalyzed = Paralysis.isParalyzed(i, G.round);
-        document.getElementById('para-' + i).textContent =
-          isParalyzed ? '💀 麻痺中' : '';
-        const handCount = Hand.count(i);
-        document.getElementById('hand-' + i).textContent =
-          handCount > 0 ? '🃏 手札 ' + handCount + '枚' : '';
-        // 装備中カード（全員公開）
-        const equipEl = document.getElementById('equip-' + i);
-        equipEl.innerHTML = '';
-        Equipped.get(i).forEach(function (c) {
-          const chip = document.createElement('span');
-          chip.className = 'equip-chip';
-          chip.textContent = c.name;
-          equipEl.appendChild(chip);
-        });
-        const card = document.querySelector('.player-card[data-idx="' + i + '"]');
-        card.classList.toggle('paralyzed', isParalyzed);
-      }
-
-      // アクティブプレイヤー
+      // 左パネル：リーダー・麻痺・手札・装備バッジ
       const activePIdx = G.phase === 'action' ? currentPlayerIdx() : Leader.current;
-      document.querySelectorAll('.player-card').forEach((el, i) => {
-        el.classList.toggle('active', i === activePIdx && !Paralysis.isParalyzed(i, G.round));
-      });
+      for (let i = 0; i < PLAYERS; i++) {
+        const badgeEl = document.getElementById('badge-' + i);
+        const paraEl  = document.getElementById('para-'  + i);
+        const handEl  = document.getElementById('hand-'  + i);
+        const equipEl = document.getElementById('equip-' + i);
+        const playerEl= document.getElementById('status-player-' + i);
+        if (!playerEl) continue;
+
+        const isLeader    = (i === Leader.current);
+        const isParalyzed = Paralysis.isParalyzed(i, G.round);
+        const isActive    = (i === activePIdx);
+
+        if (badgeEl) { badgeEl.textContent = isLeader ? '👑 リーダー' : ''; badgeEl.style.display = isLeader ? '' : 'none'; }
+        if (paraEl)  { paraEl.textContent  = isParalyzed ? '💀 麻痺中' : ''; paraEl.style.display  = isParalyzed ? '' : 'none'; }
+        if (handEl)  { handEl.textContent  = '🃏 ' + Hand.count(i) + '枚'; }
+
+        // 装備チップ
+        if (equipEl) {
+          equipEl.innerHTML = '';
+          Equipped.get(i).forEach(function (c) {
+            const chip = document.createElement('span');
+            chip.className = 'equip-chip';
+            chip.textContent = c.name;
+            equipEl.appendChild(chip);
+          });
+        }
+
+        playerEl.classList.toggle('active',    isActive);
+        playerEl.classList.toggle('paralyzed', isParalyzed);
+      }
 
       // フェイズメッセージ
       const msgEl = document.getElementById('phase-msg');
@@ -1242,7 +1333,11 @@
           const btn = document.createElement('button');
           btn.className = 'hand-tab-btn' + (idx === pIdx ? ' active' : '');
           btn.textContent = pname(idx);
-          btn.onclick = function () { G.handPlayer = idx; updateHandPanel(); };
+          btn.onclick = function () {
+            G.handPlayer = idx;
+            G.handRevealed = false; // 別のプレイヤーに切り替えたら必ず非表示
+            updateHandPanel();
+          };
           tabsEl.appendChild(btn);
         })(i);
       }
@@ -1255,13 +1350,42 @@
 
       playerEl.textContent = pname(pIdx) + ' の手札';
 
-      const cards = Hand.get(pIdx);
-      if (cards.length === 0) {
-        listEl.innerHTML = '<div class="hand-empty">手札なし</div>';
+      // プライバシーゲート：未確認なら隠す
+      if (!G.handRevealed) {
+        listEl.innerHTML = '';
+        const gate = document.createElement('div');
+        gate.className = 'hand-privacy-gate';
+        const warn = document.createElement('p');
+        warn.className = 'hand-privacy-warn';
+        warn.textContent = '⚠️ 他のプレイヤーは\n画面を見ないでください';
+        warn.style.whiteSpace = 'pre-line';
+        const revBtn = document.createElement('button');
+        revBtn.className = 'hand-reveal-btn';
+        revBtn.textContent = '👁 手札を見る';
+        revBtn.onclick = function () { G.handRevealed = true; updateHandPanel(); };
+        gate.appendChild(warn);
+        gate.appendChild(revBtn);
+        listEl.appendChild(gate);
         return;
       }
 
+      const cards = Hand.get(pIdx);
       listEl.innerHTML = '';
+
+      // 手札を隠すボタン
+      const hideBtn = document.createElement('button');
+      hideBtn.className = 'hand-hide-btn';
+      hideBtn.textContent = '🙈 手札を隠す';
+      hideBtn.onclick = function () { G.handRevealed = false; updateHandPanel(); };
+      listEl.appendChild(hideBtn);
+
+      if (cards.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'hand-empty';
+        empty.textContent = '手札なし';
+        listEl.appendChild(empty);
+        return;
+      }
       cards.forEach(function (card) {
         const div = document.createElement('div');
         div.className = 'hand-card';
@@ -1405,19 +1529,35 @@
     // ─────────────────────────────────────────────
     function buildPlayerCards() {
       G.handPlayer = 0;
-      const container = document.getElementById('players');
-      container.innerHTML = '';
+      G.handRevealed = false;
+      // 左パネルにプレイヤー行を生成
+      const panel = document.getElementById('status-panel');
+      // タイトルを残して再構築
+      panel.innerHTML = '<div id="status-panel-title">👥 プレイヤー</div>';
       for (let i = 0; i < PLAYERS; i++) {
-        const div = document.createElement('div');
-        div.className = 'player-card';
-        div.setAttribute('data-idx', i);
-        div.innerHTML =
-          '<span class="leader-badge" id="badge-' + i + '"></span>' +
-          '<span class="para-badge"   id="para-'  + i + '"></span>' +
-          pname(i) +
-          '<span class="hand-badge"   id="hand-'  + i + '"></span>' +
-          '<div class="equip-display" id="equip-'  + i + '"></div>';
-        container.appendChild(div);
+        (function (idx) {
+          const div = document.createElement('div');
+          div.className = 'status-player';
+          div.id = 'status-player-' + idx;
+          div.onclick = function () {
+            G.handPlayer   = idx;
+            G.handRevealed = false;
+            updateHandPanel();
+            // アクティブ強調
+            document.querySelectorAll('.status-player').forEach(function (el) {
+              el.classList.toggle('selected-hand', el.id === 'status-player-' + idx);
+            });
+          };
+          div.innerHTML =
+            '<div class="status-player-name">' + pname(idx) + '</div>' +
+            '<div class="status-badges">' +
+              '<span id="badge-' + idx + '" class="status-badge leader" style="display:none"></span>' +
+              '<span id="para-'  + idx + '" class="status-badge para"   style="display:none"></span>' +
+              '<span id="hand-'  + idx + '" class="status-badge hand"></span>' +
+            '</div>' +
+            '<div class="status-equips" id="equip-' + idx + '"></div>';
+          panel.appendChild(div);
+        })(i);
       }
     }
 
