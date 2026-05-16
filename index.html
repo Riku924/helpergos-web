@@ -1141,6 +1141,11 @@
       Shipwreck.init();
       Hand.init(PLAYERS);
       G.turnOrder = Leader.turnOrder();
+      // 初期手札を配る
+      const _rCPP = Shipwreck.initialCardsPerPlayer(PLAYERS);
+      Shipwreck.dealInitial(PLAYERS, _rCPP).forEach(function (cards, i) {
+        cards.forEach(function (c) { Hand.add(i, c); });
+      });
 
       document.getElementById('end-overlay').style.display = 'none';
       document.getElementById('flip-btn').disabled = false;
@@ -1153,6 +1158,7 @@
       updateUI();
       addLog(Leader.name() + ' がリーダーに選ばれた！');
       addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
+      addLog('難破船カードを各自 ' + _rCPP + ' 枚配りました。');
     }
 
     // ─────────────────────────────────────────────
@@ -1168,9 +1174,15 @@
     const _init = Resources.getInitial(PLAYERS);
     G.food  = _init.food;
     G.water = _init.water;
+    // 初期手札を配る
+    const _initCPP = Shipwreck.initialCardsPerPlayer(PLAYERS);
+    Shipwreck.dealInitial(PLAYERS, _initCPP).forEach(function (cards, i) {
+      cards.forEach(function (c) { Hand.add(i, c); });
+    });
     updateUI();
     addLog(Leader.name() + ' がリーダーに選ばれた！');
     addLog('初期資源: 食料 ' + G.food + '、水 ' + G.water);
+    addLog('難破船カードを各自 ' + _initCPP + ' 枚配りました。');
   </script>
 </body>
 </html>

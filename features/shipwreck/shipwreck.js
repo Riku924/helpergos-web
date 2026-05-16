@@ -91,6 +91,30 @@
       return this.deck.slice(Math.max(0, len - n), len).reverse();
     },
 
+    /**
+     * 初期配布: 各プレイヤーに cardsPerPlayer 枚ずつ配り、手札カード配列の配列を返す
+     * 配った分はデッキから除かれる（残りが船あさりの山札になる）
+     * @param {number} numPlayers
+     * @param {number} cardsPerPlayer  3〜8人=4枚 / 9〜12人=3枚
+     * @returns {Array[]} 各プレイヤーの初期手札カード配列
+     */
+    dealInitial: function (numPlayers, cardsPerPlayer) {
+      const hands = [];
+      for (let i = 0; i < numPlayers; i++) {
+        const hand = [];
+        for (let j = 0; j < cardsPerPlayer && this.deck.length > 0; j++) {
+          hand.push(this.deck.pop());
+        }
+        hands.push(hand);
+      }
+      return hands;
+    },
+
+    /** 人数に応じた初期配布枚数を返す */
+    initialCardsPerPlayer: function (numPlayers) {
+      return numPlayers <= 8 ? 4 : 3;
+    },
+
     _shuffle: function () {
       for (let i = this.deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
