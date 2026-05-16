@@ -62,6 +62,62 @@
     .status-badge.para     { background: rgba(156,39,176,0.25);  color: #ce93d8; }
     .status-badge.hand     { background: rgba(255,255,255,0.1);  color: #ccc; }
     .status-equips         { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; }
+    /* 左パネル インライン手札 */
+    .hand-inline {
+      margin-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 8px;
+    }
+    .hand-inline-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .hand-inline-warn  { font-size: 0.7em; color: #ff9800; line-height: 1.4; text-align: center; }
+    .hand-inline-reveal {
+      padding: 5px 12px;
+      font-size: 0.75em;
+      background: #ffd700;
+      color: #1a2a00;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: bold;
+    }
+    .hand-inline-reveal:hover { background: #ffe44d; }
+    .hand-inline-hide {
+      padding: 3px 10px;
+      font-size: 0.7em;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 5px;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 4px;
+      width: 100%;
+    }
+    .hand-inline-hide:hover { border-color: #ff9800; color: #ff9800; }
+    .hand-inline-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-bottom: 5px;
+      font-size: 0.78em;
+    }
+    .hand-inline-card-name { font-weight: bold; margin-bottom: 2px; }
+    .hand-inline-card-desc { color: #aaa; font-size: 0.85em; line-height: 1.3; }
+    .hand-inline-card-actions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .hand-badge-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: inherit; color: inherit; padding: 0; font-family: inherit;
+      text-decoration: underline dotted;
+    }
+    .hand-badge-btn:hover { color: #ffd700; }
 
     /* ── ロビー ── */
     #lobby {
@@ -1320,26 +1376,140 @@
       updateUI(); // アクション消費なし
     }
 
+    // ─────────────────────────────────────────────
+    //  左パネル インライン手札
+    // ─────────────────────────────────────────────
+    function toggleInlineHand(playerIdx) {
+      const el = document.getElementById('hand-inline-' + playerIdx);
+      if (!el) return;
+      // 他のプレイヤーのを全部閉じる
+      for (let i = 0; i < PLAYERS; i++) {
+        if (i !== playerIdx) {
+          const other = document.getElementById('hand-inline-' + i);
+          if (other) other.style.display = 'none';
+        }
+      }
+      if (el.style.display === 'none' || el.style.display === '') {
+        el.style.display = 'block';
+        renderInlineHand(playerIdx, false); // プライバシーゲートから開始
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    function renderInlineHand(playerIdx, revealed) {
+      const el = document.getElementById('hand-inline-' + playerIdx);
+      if (!el) return;
+      el.innerHTML = '';
+
+      if (!revealed) {
+        // プライバシーゲート
+        const gate = document.createElement('div');
+        gate.className = 'hand-inline-gate';
+        const warn = document.createElement('p');
+        warn.className = 'hand-inline-warn';
+        warn.textContent = '⚠️ 他のプレイヤーは\n目を閉じてください';
+        warn.style.whiteSpace = 'pre-line';
+        const revBtn = document.createElement('button');
+        revBtn.className = 'hand-inline-reveal';
+        revBtn.textContent = '👁 手札を見る';
+        revBtn.onclick = function () { renderInlineHand(playerIdx, true); };
+        gate.appendChild(warn);
+        gate.appendChild(revBtn);
+        el.appendChild(gate);
+        return;
+      }
+
+      // 手を隠すボタン
+      const hideBtn = document.createElement('button');
+      hideBtn.className = 'hand-inline-hide';
+      hideBtn.textContent = '🙈 手札を隠す';
+      hideBtn.onclick = function () { renderInlineHand(playerIdx, false); };
+      el.appendChild(hideBtn);
+
+      const cards = Hand.get(playerIdx);
+      if (cards.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:0.75em;color:#555;text-align:center;padding:8px 0;';
+        empty.textContent = '手札なし';
+        el.appendChild(empty);
+        return;
+      }
+
+      cards.forEach(function (card) {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'hand-inline-card';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'hand-inline-card-name';
+        nameEl.textContent = card.name;
+        cardDiv.appendChild(nameEl);
+
+        const descEl = document.createElement('div');
+        descEl.className = 'hand-inline-card-desc';
+        descEl.textContent = getCardDesc(card);
+        cardDiv.appendChild(descEl);
+
+        const actEl = document.createElement('div');
+        actEl.className = 'hand-inline-card-actions';
+
+        if (card.type === 'equipment') {
+          const btn = document.createElement('button');
+          btn.className = 'hand-use-btn';
+          btn.style.fontSize = '0.72em';
+          btn.textContent = '装備する';
+          if (canUseCard(card, playerIdx)) {
+            btn.onclick = function () { useCard(card.id, playerIdx); renderInlineHand(playerIdx, true); };
+          } else {
+            btn.disabled = true;
+          }
+          actEl.appendChild(btn);
+        } else if (canUseCard(card, playerIdx)) {
+          const btn = document.createElement('button');
+          btn.className = 'hand-use-btn';
+          btn.style.fontSize = '0.72em';
+          btn.textContent = '使う';
+          btn.onclick = function () { useCard(card.id, playerIdx); renderInlineHand(playerIdx, true); };
+          actEl.appendChild(btn);
+        }
+
+        if (G.phase !== 'ended' && PLAYERS > 1) {
+          const giveBtn = document.createElement('button');
+          giveBtn.className = 'hand-give-btn';
+          giveBtn.textContent = '渡す';
+          giveBtn.onclick = (function (cid, pi) {
+            return function () { openTransferModal(cid, pi); };
+          })(card.id, playerIdx);
+          actEl.appendChild(giveBtn);
+        }
+
+        cardDiv.appendChild(actEl);
+        el.appendChild(cardDiv);
+      });
+    }
+
     function updateHandPanel() {
       const pIdx   = G.handPlayer;
       const playerEl = document.getElementById('hand-panel-player');
       const listEl   = document.getElementById('hand-cards-list');
       const tabsEl   = document.getElementById('hand-player-tabs');
 
-      // タブ更新
-      tabsEl.innerHTML = '';
-      for (let i = 0; i < PLAYERS; i++) {
-        (function (idx) {
-          const btn = document.createElement('button');
-          btn.className = 'hand-tab-btn' + (idx === pIdx ? ' active' : '');
-          btn.textContent = pname(idx);
-          btn.onclick = function () {
-            G.handPlayer = idx;
-            G.handRevealed = false; // 別のプレイヤーに切り替えたら必ず非表示
-            updateHandPanel();
-          };
-          tabsEl.appendChild(btn);
-        })(i);
+      // タブ更新（要素が存在する場合のみ）
+      if (tabsEl) {
+        tabsEl.innerHTML = '';
+        for (let i = 0; i < PLAYERS; i++) {
+          (function (idx) {
+            const btn = document.createElement('button');
+            btn.className = 'hand-tab-btn' + (idx === pIdx ? ' active' : '');
+            btn.textContent = pname(idx);
+            btn.onclick = function () {
+              G.handPlayer = idx;
+              G.handRevealed = false;
+              updateHandPanel();
+            };
+            tabsEl.appendChild(btn);
+          })(i);
+        }
       }
 
       if (G.phase === 'ended') {
@@ -1553,9 +1723,10 @@
             '<div class="status-badges">' +
               '<span id="badge-' + idx + '" class="status-badge leader" style="display:none"></span>' +
               '<span id="para-'  + idx + '" class="status-badge para"   style="display:none"></span>' +
-              '<span id="hand-'  + idx + '" class="status-badge hand"></span>' +
+              '<button class="hand-badge-btn status-badge hand" id="hand-' + idx + '" onclick="toggleInlineHand(' + idx + ')"></button>' +
             '</div>' +
-            '<div class="status-equips" id="equip-' + idx + '"></div>';
+            '<div class="status-equips" id="equip-' + idx + '"></div>' +
+            '<div class="hand-inline" id="hand-inline-' + idx + '" style="display:none"></div>';
           panel.appendChild(div);
         })(i);
       }
