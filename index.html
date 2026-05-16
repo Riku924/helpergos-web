@@ -62,6 +62,19 @@
     .status-badge.para     { background: rgba(156,39,176,0.25);  color: #ce93d8; }
     .status-badge.hand     { background: rgba(255,255,255,0.1);  color: #ccc; }
     .status-equips         { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; }
+    /* 受信トレイバッジ */
+    .inbox-badge {
+      display: inline-block;
+      font-size: 0.65em;
+      background: rgba(233,30,99,0.3);
+      color: #f48fb1;
+      border: 1px solid rgba(233,30,99,0.5);
+      border-radius: 4px;
+      padding: 1px 6px;
+      cursor: pointer;
+      margin-top: 3px;
+    }
+    .inbox-badge:hover { background: rgba(233,30,99,0.5); }
     /* 左パネル インライン手札 */
     .hand-inline {
       margin-top: 8px;
@@ -936,7 +949,7 @@
         <select id="chat-recipient" title="宛先"></select>
       </div>
       <input id="chat-text" type="text" placeholder="メッセージを入力…" maxlength="100"
-             onkeydown="if(event.key==='Enter'){ sendChatMessage(); event.preventDefault(); }">
+             onkeydown="if(event.key==='Enter' && !event.isComposing){ sendChatMessage(); event.preventDefault(); }">
       <button id="chat-send-btn" onclick="sendChatMessage()">送信</button>
     </div>
   </div>
@@ -1002,6 +1015,7 @@
       extraActionThisTurn: false, // コーヒー使用時の追加アクションフラグ
       handPlayer: 0,              // 手札パネルで表示中のプレイヤーインデックス
       handRevealed: false,        // 手札が表示中かどうか
+      privateInbox: {},           // { playerIdx: [{ from, text }, ...] }
     };
 
     function currentPlayerIdx() { return G.turnOrder[G.turnIndex]; }
@@ -1634,8 +1648,10 @@
       document.getElementById('chat-text').focus();
 
       if (recipientIdx >= 0 && recipientIdx !== senderIdx) {
-        // 秘密チャット：ログには何も残さずモーダルのみ表示
-        openPrivateChatModal(senderIdx, recipientIdx, text);
+        // 秘密チャット：ログにもモーダルにも表示せず受信トレイへ直接格納
+        if (!G.privateInbox[recipientIdx]) G.privateInbox[recipientIdx] = [];
+        G.privateInbox[recipientIdx].push({ from: senderIdx, text: text });
+        updateInboxBadges();
       } else {
         // 全員宛の公開メッセージ
         appendChatMessage(pname(senderIdx), text, false);
@@ -1662,16 +1678,45 @@
     }
 
     // ─── 秘密チャットモーダル ───
-    var _privateChatText = '';
+    // ─── 受信トレイバッジ更新 ───
+    function updateInboxBadges() {
+      for (var i = 0; i < PLAYERS; i++) {
+        var badgeEl = document.getElementById('inbox-badge-' + i);
+        if (!badgeEl) continue;
+        var msgs = G.privateInbox[i] || [];
+        badgeEl.innerHTML = '';
+        if (msgs.length > 0) {
+          var btn = document.createElement('button');
+          btn.className = 'inbox-badge';
+          btn.textContent = '📩 ' + msgs.length + '件の秘密メッセージ';
+          (function (idx) {
+            btn.onclick = function (e) {
+              e.stopPropagation();
+              openInboxModal(idx);
+            };
+          })(i);
+          badgeEl.appendChild(btn);
+        }
+      }
+    }
 
-    function openPrivateChatModal(senderIdx, recipientIdx, text) {
-      _privateChatText = text;
+    function openInboxModal(playerIdx) {
+      var msgs = G.privateInbox[playerIdx] || [];
+      if (msgs.length === 0) return;
       document.getElementById('private-chat-header').textContent =
-        pname(recipientIdx) + ' さんへのメッセージです。他のプレイヤーは目を閉じてください。';
+        pname(playerIdx) + ' さん宛のメッセージです。他のプレイヤーは目を閉じてください。';
       document.getElementById('private-chat-content').style.display = 'none';
-      document.getElementById('private-chat-content').textContent = text;
+      document.getElementById('private-chat-content').innerHTML = '';
+      msgs.forEach(function (m) {
+        var line = document.createElement('div');
+        line.style.marginBottom = '6px';
+        line.innerHTML = '<strong style="color:#87ceeb;">' + pname(m.from) + ':</strong> ' + m.text;
+        document.getElementById('private-chat-content').appendChild(line);
+      });
       document.getElementById('private-chat-gate').style.display = '';
       document.getElementById('private-chat-modal').style.display = 'flex';
+      // 確認後に既読として削除
+      document.getElementById('private-chat-modal')._clearFor = playerIdx;
     }
 
     function revealPrivateChat() {
@@ -1680,8 +1725,13 @@
     }
 
     function closePrivateChatModal() {
+      var playerIdx = document.getElementById('private-chat-modal')._clearFor;
+      if (playerIdx !== undefined && playerIdx !== null) {
+        G.privateInbox[playerIdx] = [];
+        updateInboxBadges();
+        document.getElementById('private-chat-modal')._clearFor = null;
+      }
       document.getElementById('private-chat-modal').style.display = 'none';
-      _privateChatText = '';
     }
 
     // ─── カード転送 ───
@@ -1788,6 +1838,7 @@
               '<button class="hand-badge-btn status-badge hand" id="hand-' + idx + '" onclick="toggleInlineHand(' + idx + ')"></button>' +
             '</div>' +
             '<div class="status-equips" id="equip-' + idx + '"></div>' +
+            '<div id="inbox-badge-' + idx + '"></div>' +
             '<div class="hand-inline" id="hand-inline-' + idx + '" style="display:none"></div>';
           panel.appendChild(div);
         })(i);
@@ -1881,10 +1932,12 @@
       document.getElementById('weather-desc').textContent = 'リーダーがカードをめくってください';
       document.getElementById('water-hint').textContent   = '雨量: ?';
       document.getElementById('log').innerHTML = '<div class="log-entry">ゲーム開始！ 力を合わせて脱出しよう。</div>';
-      // チャット初期化
+      // チャット・受信トレイ初期化
+      G.privateInbox = {};
       var chatLog = document.getElementById('chat-log');
       if (chatLog) chatLog.innerHTML = '';
       updateChatSenderSelect();
+      updateInboxBadges();
       enableActions(false);
       updateUI();
       addLog(Leader.name() + ' がリーダーに選ばれた！');
