@@ -493,15 +493,17 @@
         border: none;
         z-index: 200;
         display: none; /* 初期非表示 */
-        padding-top: 48px; /* 閉じるボタン分 */
+        padding: 0;    /* 閉じるボタンはflexフローに含める */
       }
       #status-panel.sp-open,
       #chat-panel.sp-open { display: flex !important; flex-direction: column; }
 
-      /* パネル内の閉じるボタン */
+      /* パネル内の閉じるボタン（flexフローの先頭・スクロールしない） */
       .sp-close-btn {
-        position: absolute;
-        top: 0; left: 0; right: 0;
+        display: flex;          /* モバイルでは表示 */
+        flex-shrink: 0;
+        position: relative;     /* absoluteをやめてフローに乗せる */
+        width: 100%;
         height: 44px;
         background: rgba(0,0,0,0.6);
         border: none;
@@ -510,7 +512,6 @@
         font-size: 0.85em;
         font-family: inherit;
         cursor: pointer;
-        display: flex;
         align-items: center;
         justify-content: center;
         gap: 6px;
@@ -531,6 +532,9 @@
       #chat-panel { overflow: hidden; }
       #chat-log   { flex: 1; }
     }
+
+    /* 閉じるボタンはPCでは非表示 */
+    .sp-close-btn { display: none; }
 
     /* 下タブバー（PCでは非表示） */
     #mobile-tab-bar {
