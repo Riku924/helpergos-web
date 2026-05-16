@@ -1136,13 +1136,15 @@
       switch (data.type) {
         case 'flip-weather':
           Weather.current = data.result;
+          if (data.turnOrder) G.turnOrder = data.turnOrder;
           document.getElementById('weather-icon').textContent = data.icon + ' ' + data.text;
           document.getElementById('weather-desc').textContent = data.desc;
           document.getElementById('flip-btn').disabled = true;
           document.getElementById('water-hint').textContent  = data.waterHint;
           addLog('リーダー ' + Leader.name() + ' が天候カードをめくった → ' + data.icon + ' ' + data.text, 'weather');
           G.phase = 'action';
-          enableActions(data.myTurn);
+          // アクションフェーズの最初のプレイヤーが自分か判定
+          enableActions(IS_MULTIPLAYER && data.firstPlayerIdx === MY_PLAYER_INDEX);
           checkAndSkipParalyzed();
           updateUI();
           break;
@@ -1217,9 +1219,13 @@
 
     function _remoteAdvanceTurn(data) {
       G.turnIndex = data.nextTurnIndex;
-      G.turnOrder = data.turnOrder;
-      if (data.isMyTurn) enableActions(true);
-      else enableActions(false);
+      if (data.turnOrder) G.turnOrder = data.turnOrder;
+      // 次のターンが自分かどうかを判定して有効化
+      const nextPlayer = G.turnOrder[G.turnIndex];
+      const myTurn = IS_MULTIPLAYER
+        ? (nextPlayer === MY_PLAYER_INDEX)
+        : false; // 同一画面モードはローカルの enableActions に任せる
+      enableActions(myTurn);
       checkAndSkipParalyzed();
       checkWin();
       updateUI();
@@ -1258,7 +1264,7 @@
       G.phase = 'action';
       broadcastAction({ type: 'flip-weather', result: rain, icon: label.icon, text: label.text,
         desc: label.desc, waterHint: document.getElementById('water-hint').textContent,
-        myTurn: currentPlayerIdx() !== (IS_MULTIPLAYER ? MY_PLAYER_INDEX : -1) });
+        firstPlayerIdx: G.turnOrder[0], turnOrder: G.turnOrder });
       enableActions(true);
       checkAndSkipParalyzed();
       updateUI();
@@ -1278,14 +1284,16 @@
         if (rod) n += FoodAction.fish();
         msg = who + ' が釣りをして 食料 +' + n + (rod ? '（釣竿効果）' : '');
         G.food += n;
-        broadcastAction({ type: 'fish', playerIdx: pIdx, amount: n, rodBonus: rod });
+        broadcastAction({ type: 'fish', playerIdx: pIdx, amount: n, rodBonus: rod,
+          nextTurnIndex: G.turnIndex + 1, turnOrder: G.turnOrder });
       } else if (type === 'water') {
         n = WaterAction.collect();
         const canteen = Equipped.hasEffect(pIdx, 'water_twice');
         if (canteen) n *= 2;
         msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + (canteen ? '（水筒効果）' : '');
         G.water += n;
-        broadcastAction({ type: 'water', playerIdx: pIdx, amount: n, canteenBonus: canteen });
+        broadcastAction({ type: 'water', playerIdx: pIdx, amount: n, canteenBonus: canteen,
+          nextTurnIndex: G.turnIndex + 1, turnOrder: G.turnOrder });
       }
 
       addLog(msg);
@@ -1302,7 +1310,8 @@
       const card = Shipwreck.draw();
       Hand.add(currentPlayerIdx(), card);
       addLog(who + ' が船あさりをして難破船カードを1枚引いた（手札: ' + Hand.count(currentPlayerIdx()) + '枚）', 'scavenge');
-      broadcastAction({ type: 'scavenge', playerIdx: currentPlayerIdx() });
+      broadcastAction({ type: 'scavenge', playerIdx: currentPlayerIdx(),
+        nextTurnIndex: G.turnIndex + 1, turnOrder: G.turnOrder });
 
       // 秘密カードを本人だけ見せるモーダルを開く
       document.getElementById('secret-card-face').textContent = '⚓ ' + card.name;
@@ -2067,7 +2076,9 @@
             '<div class="status-badges">' +
               '<span id="badge-' + idx + '" class="status-badge leader" style="display:none"></span>' +
               '<span id="para-'  + idx + '" class="status-badge para"   style="display:none"></span>' +
-              '<button class="hand-badge-btn status-badge hand" id="hand-' + idx + '" onclick="toggleInlineHand(' + idx + ')"></button>' +
+              ((!IS_MULTIPLAYER || idx === MY_PLAYER_INDEX)
+                ? '<button class="hand-badge-btn status-badge hand" id="hand-' + idx + '" onclick="toggleInlineHand(' + idx + ')"></button>'
+                : '<span class="status-badge hand" id="hand-' + idx + '" style="cursor:default;" title="他のプレイヤーの手札は見れません"></span>') +
             '</div>' +
             '<div class="status-equips" id="equip-' + idx + '"></div>' +
             '<div class="hand-inline" id="hand-inline-' + idx + '" style="display:none"></div>';
