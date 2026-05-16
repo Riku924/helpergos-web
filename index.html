@@ -87,6 +87,18 @@
     .hand-use-btn:hover:not(:disabled) { background: #ffe44d; }
     .hand-use-btn:disabled { background: #444; color: #666; cursor: default; }
     .hand-empty { font-size: 0.8em; color: #555; text-align: center; padding: 24px 0; }
+    /* 装備中カード表示（全員公開） */
+    .equip-display { margin-top: 4px; min-height: 0; }
+    .equip-chip {
+      display: inline-block;
+      font-size: 0.65em;
+      background: rgba(139,195,74,0.25);
+      color: #8bc34a;
+      border: 1px solid rgba(139,195,74,0.4);
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin: 1px 1px 0 0;
+    }
 
     h1 { font-size: 2em; color: #ffd700; letter-spacing: 0.05em; }
     .subtitle { color: #87ceeb; font-size: 0.85em; }
@@ -452,18 +464,21 @@
       <span class="para-badge"   id="para-0"></span>
       プレイヤー1
       <span class="hand-badge"   id="hand-0"></span>
+      <div class="equip-display"  id="equip-0"></div>
     </div>
     <div class="player-card" data-idx="1">
       <span class="leader-badge" id="badge-1"></span>
       <span class="para-badge"   id="para-1"></span>
       プレイヤー2
       <span class="hand-badge"   id="hand-1"></span>
+      <div class="equip-display"  id="equip-1"></div>
     </div>
     <div class="player-card" data-idx="2">
       <span class="leader-badge" id="badge-2"></span>
       <span class="para-badge"   id="para-2"></span>
       プレイヤー3
       <span class="hand-badge"   id="hand-2"></span>
+      <div class="equip-display"  id="equip-2"></div>
     </div>
   </div>
 
@@ -568,6 +583,7 @@
   <script src="features/rafttrack/rafttrack.js"></script>
   <script src="features/shipwreck/shipwreck.js"></script>
   <script src="features/hand/hand.js"></script>
+  <script src="features/equipped/equipped.js"></script>
   <script src="features/resources/resources.js"></script>
 
   <script>
@@ -615,12 +631,12 @@
       const pIdx = currentPlayerIdx();
       if (type === 'fish') {
         n = FoodAction.fish();
-        if (Hand.hasEffect(pIdx, 'fish_twice')) { n += FoodAction.fish(); msg = who + ' が釣りをして 食料 +' + n + '（釣竿効果）'; }
+        if (Equipped.hasEffect(pIdx, 'fish_twice')) { n += FoodAction.fish(); msg = who + ' が釣りをして 食料 +' + n + '（釣竿効果）'; }
         else { msg = who + ' が釣りをして 食料 +' + n; }
         G.food += n;
       } else if (type === 'water') {
         n = WaterAction.collect();
-        if (Hand.hasEffect(pIdx, 'water_twice')) { n *= 2; msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + '（水筒効果）'; }
+        if (Equipped.hasEffect(pIdx, 'water_twice')) { n *= 2; msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : '') + '（水筒効果）'; }
         else { msg = who + ' が水を汲んで 水 +' + n + (n === 0 ? ' (雨なし)' : ''); }
         G.water += n;
       }
@@ -669,7 +685,7 @@
       enableActions(false);
 
       // 斧装備なら入り口の保証木材が2本になる
-      const guaranteed = Hand.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
+      const guaranteed = Equipped.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
       document.getElementById('guaranteed-wood-text').textContent = guaranteed + '本';
       document.getElementById('guaranteed-track-text').textContent = guaranteed;
 
@@ -689,7 +705,7 @@
     function chooseDeeper(goDeeper) {
       if (!goDeeper) {
         // やめる → モーダルを閉じてターン終了
-        const g = Hand.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
+        const g = Equipped.hasEffect(currentPlayerIdx(), 'logging_boost') ? 2 : RaftAction.GUARANTEED;
         addLog(pname(currentPlayerIdx()) + ' は森の入り口で引き返した。いかだトラック +' + g);
         document.getElementById('raft-modal').style.display = 'none';
         if (checkWin()) return;
@@ -871,7 +887,7 @@
 
       document.getElementById('round').textContent = G.round;
 
-      // リーダー・麻痺・手札バッジ
+      // リーダー・麻痺・手札・装備バッジ
       for (let i = 0; i < PLAYERS; i++) {
         document.getElementById('badge-' + i).textContent =
           i === Leader.current ? '👑 リーダー' : '';
@@ -881,6 +897,15 @@
         const handCount = Hand.count(i);
         document.getElementById('hand-' + i).textContent =
           handCount > 0 ? '🃏 手札 ' + handCount + '枚' : '';
+        // 装備中カード（全員公開）
+        const equipEl = document.getElementById('equip-' + i);
+        equipEl.innerHTML = '';
+        Equipped.get(i).forEach(function (c) {
+          const chip = document.createElement('span');
+          chip.className = 'equip-chip';
+          chip.textContent = c.name;
+          equipEl.appendChild(chip);
+        });
         const card = document.querySelector('.player-card[data-idx="' + i + '"]');
         card.classList.toggle('paralyzed', isParalyzed);
       }
@@ -962,12 +987,13 @@
     function canUseCard(card, playerIdx) {
       if (G.phase !== 'action') return false;
       if (currentPlayerIdx() !== playerIdx) return false;
-      if (G.extraActionThisTurn) return false; // 追加アクション中はカード使用不可
-      if (['useless','equipment','reaction','ammo'].includes(card.type)) return false;
+      if (G.extraActionThisTurn) return false;
+      // 装備カードは「装備する」アクションとして使用可能
+      if (card.type === 'equipment') return true;
+      if (['useless','reaction','ammo'].includes(card.type)) return false;
       if (card.type === 'round_end') return false;
       if (card.type === 'special' && card.timing === 'round_start') return false;
-      if (card.type === 'modifier') return false; // 複合使用は別フロー
-      if (card.effect === 'eliminate') return false; // 銃は弾丸との組み合わせ
+      if (card.type === 'modifier') return false;
       if (card.effect === 'convert' && G.food < card.fromAmount) return false;
       return true;
     }
@@ -1009,6 +1035,16 @@
       const pIdx = currentPlayerIdx();
       const card = Hand.get(pIdx).find(function (c) { return c.id === cardId; });
       if (!card) return;
+
+      // 装備カードは装備エリアに移動（全員公開）
+      if (card.type === 'equipment') {
+        Hand.remove(pIdx, cardId);
+        Equipped.add(pIdx, card);
+        addLog(pname(pIdx) + ' が「' + card.name + '」を装備した！（全員から見える）', 'raft-done');
+        if (checkWin()) return;
+        advanceTurn();
+        return;
+      }
 
       const result = applyCardEffect(card, pIdx);
       if (result === null) return;
@@ -1090,7 +1126,7 @@
           const usable = canUseCard(card, pIdx);
           const btn = document.createElement('button');
           btn.className = 'hand-use-btn';
-          btn.textContent = '使う';
+          btn.textContent = card.type === 'equipment' ? '装備する' : '使う';
           btn.disabled = !usable;
           if (usable) btn.onclick = function () { useCard(card.id); };
           div.appendChild(btn);
@@ -1140,6 +1176,7 @@
       Paralysis.reset();
       Shipwreck.init();
       Hand.init(PLAYERS);
+      Equipped.init(PLAYERS);
       G.turnOrder = Leader.turnOrder();
       // 初期手札を配る
       const _rCPP = Shipwreck.initialCardsPerPlayer(PLAYERS);
@@ -1170,6 +1207,7 @@
     Paralysis.reset();
     Shipwreck.init();
     Hand.init(PLAYERS);
+    Equipped.init(PLAYERS);
     G.turnOrder = Leader.turnOrder();
     const _init = Resources.getInitial(PLAYERS);
     G.food  = _init.food;
