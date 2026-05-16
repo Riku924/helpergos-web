@@ -38,6 +38,12 @@
       return this.LABEL[this.current];
     },
 
+    /** 山札の上からn枚の内容を確認する（デッキは変更しない）。気圧計の効果で使用。 */
+    peekTop: function (n) {
+      const len = this.deck.length;
+      return this.deck.slice(Math.max(0, len - n), len).reverse();
+    },
+
     _shuffle: function () {
       for (let i = this.deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
