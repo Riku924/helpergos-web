@@ -1674,24 +1674,7 @@
     // ─── 秘密チャットモーダル ───
     // ─── 受信トレイバッジ更新 ───
     function updateInboxBadges() {
-      for (var i = 0; i < PLAYERS; i++) {
-        var badgeEl = document.getElementById('inbox-badge-' + i);
-        if (!badgeEl) continue;
-        var msgs = G.privateInbox[i] || [];
-        badgeEl.innerHTML = '';
-        if (msgs.length > 0) {
-          var btn = document.createElement('button');
-          btn.className = 'inbox-badge';
-          btn.textContent = '📩 ' + msgs.length + '件の秘密メッセージ';
-          (function (idx) {
-            btn.onclick = function (e) {
-              e.stopPropagation();
-              openInboxModal(idx);
-            };
-          })(i);
-          badgeEl.appendChild(btn);
-        }
-      }
+      // 秘密メッセージの通知は表示しない（将来的にチャット欄への配信で実装予定）
     }
 
     function openInboxModal(playerIdx) {
@@ -1832,7 +1815,6 @@
               '<button class="hand-badge-btn status-badge hand" id="hand-' + idx + '" onclick="toggleInlineHand(' + idx + ')"></button>' +
             '</div>' +
             '<div class="status-equips" id="equip-' + idx + '"></div>' +
-            '<div id="inbox-badge-' + idx + '"></div>' +
             '<div class="hand-inline" id="hand-inline-' + idx + '" style="display:none"></div>';
           panel.appendChild(div);
         })(i);
