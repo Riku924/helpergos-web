@@ -2201,7 +2201,9 @@
       // 左パネルにプレイヤー行を生成
       const panel = document.getElementById('status-panel');
       // タイトルを残して再構築
-      panel.innerHTML = '<div id="status-panel-title">👥 プレイヤー</div>';
+      panel.innerHTML =
+        '<button class="sp-close-btn" onclick="closeMobilePanel(\'status\')">✕ 閉じる</button>' +
+        '<div id="status-panel-title">👥 プレイヤー</div>';
       for (let i = 0; i < PLAYERS; i++) {
         (function (idx) {
           const div = document.createElement('div');
