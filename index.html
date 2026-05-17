@@ -2458,9 +2458,19 @@
       document.getElementById('voting-modal').style.display = 'none';
 
       if (_vPending !== null && _vPending !== undefined) {
+        const wasLeader = (_vPending === Leader.current);
         G.eliminated.push(_vPending);
         addLog('💀 ' + pname(_vPending) + ' が脱落した。', 'round-end');
         appendChatMessage('システム', pname(_vPending) + ' が脱落しました。', true);
+
+        if (wasLeader) {
+          let next = (Leader.current + 1) % PLAYERS;
+          while (G.eliminated.includes(next)) next = (next + 1) % PLAYERS;
+          Leader.current = next;
+          addLog('👑 リーダーが ' + pname(next) + ' に移った。', 'round-end');
+          appendChatMessage('システム', '新リーダー: ' + pname(next), true);
+        }
+
         _vPending = null;
       } else {
         // 全員免疫の場合: 免疫リセットして再投票
