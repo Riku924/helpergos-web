@@ -483,17 +483,19 @@
       }
       h1 { font-size: 1.5em; }
 
-      /* サイドパネルをフルスクリーンオーバーレイに変更 */
+      /* サイドパネルをフルスクリーンオーバーレイに変更（タブバー分を除く） */
       #status-panel,
       #chat-panel {
         position: fixed;
-        inset: 0;
+        top: 0; left: 0; right: 0;
+        bottom: 58px; /* タブバーの高さ分を空ける */
         width: 100%;
-        height: 100%;
+        height: auto;
         border: none;
         z-index: 200;
         display: none; /* 初期非表示 */
-        padding: 0;    /* 閉じるボタンはflexフローに含める */
+        padding: 0;
+        overflow-y: auto;
       }
       #status-panel.sp-open,
       #chat-panel.sp-open { display: flex !important; flex-direction: column; }
@@ -542,9 +544,9 @@
       position: fixed;
       bottom: 0; left: 0; right: 0;
       height: 58px;
-      background: rgba(0,0,0,0.85);
-      border-top: 1px solid rgba(255,255,255,0.12);
-      z-index: 150;
+      background: rgba(0,0,0,0.92);
+      border-top: 1px solid rgba(255,255,255,0.15);
+      z-index: 300; /* パネル(200)より必ず上 */
     }
     .tab-btn {
       flex: 1;
