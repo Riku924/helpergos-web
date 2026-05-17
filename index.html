@@ -1216,7 +1216,7 @@
       <div id="vote-result-area" style="display:none;">
         <h3 style="font-size:1.05em;color:#ff6b6b;text-align:center;margin-bottom:12px;">🗳 投票結果</h3>
         <div id="vote-result-content" style="margin-bottom:16px;"></div>
-        <button onclick="confirmVoteResult()" style="width:100%;padding:10px;background:rgba(200,40,40,0.3);border:1px solid rgba(255,80,80,0.5);border-radius:8px;color:#fff;font-family:inherit;font-size:0.9em;cursor:pointer;">確認して次へ →</button>
+        <button id="vote-confirm-btn" onclick="confirmVoteResult()" style="width:100%;padding:10px;background:rgba(200,40,40,0.3);border:1px solid rgba(255,80,80,0.5);border-radius:8px;color:#fff;font-family:inherit;font-size:0.9em;cursor:pointer;">確認して次へ →</button>
       </div>
 
     </div>
@@ -2385,9 +2385,9 @@
       document.getElementById('vote-form-area').style.display = 'none';
       document.getElementById('vote-result-area').style.display = 'block';
 
-      const alive       = alivePlayers();
+      const alive        = alivePlayers();
       const doubleVoters = alive.filter(function (i) { return Equipped.hasEffect(i, 'double_vote'); });
-      const result      = Voting.tally(alive, _vImmune, doubleVoters);
+      const result       = Voting.tally(alive, _vImmune, doubleVoters);
 
       let html = '<div style="margin-bottom:14px;">';
       const counts = result.counts || {};
@@ -2402,24 +2402,55 @@
       });
       html += '</div>';
 
-      // 同票処理: 生存者の中で先頭（alivePlayers の先頭）がタイブレーク
+      const confirmBtn = document.getElementById('vote-confirm-btn');
+
       if (result.tied) {
+        // 同票 → リーダーが最終決定
+        _vPending = null;
+        confirmBtn.style.display = 'none';
         const eligible = alive.filter(function (p) { return !_vImmune.includes(p); });
-        _vPending = eligible.length > 0 ? eligible[0] : null;
-        html += '<p style="font-size:0.8em;color:#ffd700;text-align:center;">同票のため ' +
-                (_vPending !== null ? pname(_vPending) : '—') + ' が脱落（先頭順）</p>';
+        const maxVotes = Math.max.apply(null, eligible.map(function (p) { return counts[p] || 0; }));
+        const tiedList = eligible.filter(function (p) { return (counts[p] || 0) === maxVotes; });
+
+        html += '<p style="color:#ffd700;text-align:center;margin-bottom:10px;">🤝 同票！ リーダー（' +
+                Leader.name() + '）が最終決定します</p>';
+        html += '<div id="vote-leader-choices">';
+        tiedList.forEach(function (idx) {
+          html += '<button class="vote-cand-btn" onclick="leaderDecide(' + idx + ')">' +
+                  pname(idx) + ' を脱落させる</button>';
+        });
+        html += '</div>';
       } else {
         _vPending = result.eliminated;
-      }
+        confirmBtn.style.display = '';
 
-      if (_vPending !== null && _vPending !== undefined) {
-        html += '<p class="vote-eliminated-msg">💀 ' + pname(_vPending) + ' が脱落します</p>';
-      } else {
-        // 全員免疫の場合: 免疫をリセットして再投票
-        html += '<p style="color:#aaa;text-align:center;">全員が免疫のため再投票します</p>';
+        if (_vPending !== null && _vPending !== undefined) {
+          html += '<p class="vote-eliminated-msg">💀 ' + pname(_vPending) + ' が脱落します</p>';
+        } else {
+          // 全員免疫の場合: 再投票
+          html += '<p style="color:#aaa;text-align:center;">全員が免疫のため再投票します</p>';
+        }
       }
 
       document.getElementById('vote-result-content').innerHTML = html;
+    }
+
+    /** 同票時にリーダーが脱落者を選択 */
+    function leaderDecide(playerIdx) {
+      _vPending = playerIdx;
+
+      const choices = document.getElementById('vote-leader-choices');
+      if (choices) choices.innerHTML = '';
+
+      const content = document.getElementById('vote-result-content');
+      const msg = document.createElement('p');
+      msg.className = 'vote-eliminated-msg';
+      msg.textContent = '💀 ' + pname(playerIdx) + ' が脱落します（リーダー決定）';
+      content.appendChild(msg);
+
+      addLog(Leader.name() + ' の最終決定: ' + pname(playerIdx) + ' を脱落。', 'round-end');
+
+      document.getElementById('vote-confirm-btn').style.display = '';
     }
 
     /** 結果を確認して脱落処理 → 再チェック */
