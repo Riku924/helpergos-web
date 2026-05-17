@@ -1107,7 +1107,7 @@
       <span class="tab-icon">👥</span>プレイヤー
     </button>
     <button class="tab-btn" id="tab-hand" onclick="toggleMobilePanel('hand')">
-      <span class="tab-icon">🃏</span>手札
+      <span class="tab-icon">🏠</span>ホーム
     </button>
     <button class="tab-btn" id="tab-chat" onclick="toggleMobilePanel('chat')">
       <span class="tab-icon">💬</span>チャット
@@ -2182,9 +2182,10 @@
       } else if (name === 'chat') {
         document.getElementById('chat-panel').classList.add('sp-open');
       } else if (name === 'hand') {
-        var myIdx = IS_MULTIPLAYER ? MY_PLAYER_INDEX : 0;
-        var el = document.getElementById('hand-inline-' + myIdx);
-        if (el) { el.style.display = 'block'; renderInlineHand(myIdx, false); }
+        // ホームボタン：何も開かずメイン画面に戻るだけ（_openMobilePanel 呼び出しなし）
+        _mobileOpenPanel = null;
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        return;
       }
     }
 
